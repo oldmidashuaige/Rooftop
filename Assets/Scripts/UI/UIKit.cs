@@ -63,6 +63,8 @@ public static class UIKit
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = sortingOrder;
         go.AddComponent<CanvasScaler>();
+        // 关键：没有 GraphicRaycaster，EventSystem 无法对 Canvas 做命中检测，按钮永远点不了
+        go.AddComponent<GraphicRaycaster>();
         return canvas;
     }
 
