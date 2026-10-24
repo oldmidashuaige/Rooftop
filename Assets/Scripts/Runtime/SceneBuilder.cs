@@ -1,5 +1,6 @@
 using UnityEngine;
 using FishNet.Managing;
+using FishNet.Object;
 using FishNet.Transporting.Tugboat;
 
 /// <summary>程序化测试场景用材质集合。</summary>
@@ -40,8 +41,61 @@ public static class SceneBuilder
         NewBox("Cover_Low", new Vector3(-10f, 0.5f, 2f), new Vector3(4f, 1f, 0.6f), mats.wall);
         NewBox("Cover_Tall", new Vector3(10f, 1.5f, 4f), new Vector3(0.6f, 3f, 4f), mats.wall);
 
+        // 门：一座普通门 + 一座上锁门（测试工人撬锁/员工钥匙）
+        NewDoor("Door_A", new Vector3(-6f, 0f, 0f), 90f, false, mats.crate);
+        NewDoor("Door_B", new Vector3(12f, 0f, 10f), 0f, true, mats.crate);
+
+        // 电台（呼叫救援）
+        var radio = NewBox("RadioStation", new Vector3(0f, 0.6f, 30f), new Vector3(1.2f, 1.2f, 0.8f), mats.crate);
+        radio.AddComponent<RadioStation>();
+
+        // 撤离区（直升机判定区）
+        var zoneGo = new GameObject("ExtractionZone");
+        Mark(zoneGo);
+        var zone = zoneGo.AddComponent<ExtractionZone>();
+        zone.size = new Vector3(8f, 4f, 8f);
+        zoneGo.transform.position = new Vector3(0f, 2f, 30f);
+
         EnsureMenuCamera();
         CreateManagers();
+    }
+
+    private static GameObject NewDoor(string name, Vector3 pos, float yRot, bool locked, Material mat)
+    {
+        var go = new GameObject(name);
+        Mark(go);
+        go.transform.position = pos;
+        go.transform.rotation = Quaternion.Euler(0f, yRot, 0f);
+        var no = go.AddComponent<NetworkObject>();
+        var door = go.AddComponent<Door>();
+        door.startLocked = locked;
+
+        // 门框碰撞（供交互射线）
+        var frame = new GameObject("Frame");
+        frame.transform.SetParent(go.transform, false);
+        var frameCol = frame.AddComponent<BoxCollider>();
+        frameCol.size = new Vector3(1.1f, 2.4f, 0.2f);
+        frameCol.isTrigger = true;
+
+        // 门板（动画旋转用）
+        var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        panel.name = "Panel";
+        panel.transform.SetParent(go.transform, false);
+        panel.transform.localPosition = new Vector3(0f, 1.2f, 0f);
+        panel.transform.localScale = new Vector3(1f, 2.4f, 0.12f);
+        panel.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        var pc = panel.GetComponent<Collider>();
+        if (pc != null) Object.DestroyImmediate(pc);
+
+        // 触发区域（检测进门）
+        var trigger = new GameObject("Trigger");
+        trigger.transform.SetParent(go.transform, false);
+        trigger.transform.localPosition = new Vector3(0f, 1.2f, 0f);
+        var tCol = trigger.AddComponent<BoxCollider>();
+        tCol.size = new Vector3(1.6f, 2.6f, 0.3f);
+        tCol.isTrigger = true;
+
+        return go;
     }
 
     private static void CreateManagers()
@@ -72,12 +126,34 @@ public static class SceneBuilder
         var sp = spGo.AddComponent<ZombieSpawner>();
         sp.spawnPoints = new[]
         {
-            new Vector3(0f, 0f, 14f),
-            new Vector3(-10f, 0f, 20f),
-            new Vector3(10f, 0f, 24f),
-            new Vector3(-6f, 0f, 30f),
-            new Vector3(7f, 0f, 34f)
+            new Vector3(-8f, 0f, 2f),
+            new Vector3(8f, 0f, 4f),
+            new Vector3(0f, 0f, 8f),
+            new Vector3(-12f, 0f, -2f),
+            new Vector3(12f, 0f, -2f)
         };
+
+        // 回合总控
+        var flowGo = new GameObject("GameFlow");
+        Mark(flowGo);
+        var flow = flowGo.AddComponent<GameFlow>();
+        flow.config = GameConfig.Load();
+        flow.humanSpawnPoints = new[]
+        {
+            new Vector3(-4f, 0.2f, -12f),
+            new Vector3(4f, 0.2f, -12f),
+            new Vector3(0f, 0.2f, -14f),
+            new Vector3(-8f, 0.2f, -10f),
+            new Vector3(8f, 0.2f, -10f)
+        };
+        flow.officeSpawnPoint = new Vector3(-18f, 0.2f, -16f);
+        flow.zombieSpawnPoint = new Vector3(0f, 0.2f, 6f);
+
+        // 声音事件总线（网络对象：接收客户端广播 + 广播 3D 音效）
+        var soundGo = new GameObject("SoundEvents");
+        Mark(soundGo);
+        soundGo.AddComponent<NetworkObject>();
+        soundGo.AddComponent<SoundEvents>();
     }
 
     public static void Clear()
@@ -104,10 +180,10 @@ public static class SceneBuilder
             }
         }
 
-        var markers = Object.FindObjectsByType<DemoObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var markers = Object.FindObjectsByType<DemoObject>(FindObjectsInactive.Include);
         foreach (var m in markers) Object.DestroyImmediate(m.gameObject);
 
-        var canvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var canvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include);
         foreach (var c in canvases)
             if (c != null && (c.GetComponent<MainMenuUI>() != null || c.GetComponent<GameHUD>() != null))
                 Object.DestroyImmediate(c.gameObject);

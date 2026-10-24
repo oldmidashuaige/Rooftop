@@ -39,9 +39,15 @@ public class MainMenuUI : MonoBehaviour
     private void HandleClientState(ClientConnectionStateArgs args)
     {
         if (args.ConnectionState == LocalConnectionState.Started)
+        {
             SetStatus("已连接，等待认证/出生…");
+            if (root != null) root.SetActive(false); // 交给大厅
+        }
         else if (args.ConnectionState == LocalConnectionState.Stopped)
+        {
             SetStatus("已断开（版本不匹配？）");
+            if (root != null) root.SetActive(true);
+        }
     }
 
     private void SetStatus(string s)

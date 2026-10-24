@@ -238,6 +238,7 @@ GameObject:
   - component: {fileID: 8477481699453202184}
   - component: {fileID: 3229153685726447108}
   - component: {fileID: 6897533857758601903}
+  - component: {fileID: 9109989121087038127}
   m_Layer: 0
   m_Name: Zombie
   m_TagString: Untagged
@@ -386,4 +387,19 @@ MonoBehaviour:
   detectRange: 60
   attackDamage: 10
   attackRange: 1.8
+  attackCooldown: 1.2
+--- !u!114 &9109989121087038127
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7814229460021991363}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1de9f8531c1c12429021fe9979a7390, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HatredBrain
+  detectRange: 45
+  attackRange: 1.9
   attackCooldown: 1.2

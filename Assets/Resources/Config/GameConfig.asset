@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24fa986841313f642aef736545fe3330, type: 3}
+  m_Name: GameConfig
+  m_EditorClassIdentifier: Assembly-CSharp::GameConfig
+  humanSlots: 5
+  zombieSlots: 1
+  infectionDuration: 30
+  extractionSeats: 3
+  extractionCountdown: 30
+  spectatorMode: 0
+  doctorUvUses: 3
+  doctorSerumUses: 2
+  uvStunDuration: 2
+  uvRange: 25
+  markRange: 25
+  markCooldown: 20
+  markHatredBoost: 150
+  eatCorpseDuration: 3
+  forgetRate: 0.12
+  acquireThreshold: 60
+  dropThreshold: 20
+  minChaseTime: 3
+  sightBonusPerSec: 8
+  regionRadius: 60
+  roamSpeed: 1
+  chaseSpeed: 4.5
+  walkStepLoudness: 1.5
+  walkStepRange: 3
+  runStepLoudness: 6
+  runStepRange: 10
+  landLoudness: 12
+  landRange: 8
+  gunshotLoudness: 60
+  gunshotRange: 45
+  pryLoudness: 18
+  pryRange: 20
+  uvLoudness: 8
+  uvRangeSound: 12

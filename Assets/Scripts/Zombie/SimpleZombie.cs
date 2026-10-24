@@ -20,9 +20,18 @@ public class SimpleZombie : NetworkBehaviour
     private MaterialPropertyBlock mpb;
     private bool dead;
     private float flashTimer;
-    private float attackTimer;
+    private float stunTimer;
 
     public bool IsDead => dead;
+    public bool IsStunned => stunTimer > 0f;
+
+    /// <summary>博士紫外灯：僵直一段时间（AI 冻结 + 白闪）。</summary>
+    [Server]
+    public void Stun(float duration)
+    {
+        stunTimer = duration;
+        RpcFlashWhite();
+    }
 
     public override void OnStartServer()
     {
@@ -41,46 +50,16 @@ public class SimpleZombie : NetworkBehaviour
             flashTimer -= Time.deltaTime;
             if (flashTimer <= 0f) RestoreColors();
         }
+        if (stunTimer > 0f) stunTimer -= Time.deltaTime;
+        // 移动/追击/攻击由 HatredBrain（服务器）驱动
+    }
 
-        if (!IsServerStarted) return;
-
-        attackTimer -= Time.deltaTime;
-        if (dead) return;
-
-        FirstPersonController target = null;
-        float best = float.MaxValue;
-        foreach (var p in FindObjectsByType<FirstPersonController>())
-        {
-            var ph = p.GetComponent<PlayerHealth>();
-            if (ph != null && ph.IsDead) continue;
-            float d = (p.transform.position - transform.position).sqrMagnitude;
-            if (d < best)
-            {
-                best = d;
-                target = p;
-            }
-        }
-        if (target == null || best > detectRange * detectRange) return;
-
-        Vector3 to = target.transform.position - transform.position;
-        to.y = 0f;
-
-        if (best <= attackRange * attackRange)
-        {
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(to.normalized), 8f * Time.deltaTime);
-            if (attackTimer <= 0f)
-            {
-                attackTimer = attackCooldown;
-                var ph = target.GetComponent<PlayerHealth>();
-                if (ph != null) ph.TakeDamage(Mathf.RoundToInt(attackDamage));
-            }
-        }
-        else if (best > 1.6f)
-        {
-            Vector3 dir = to.normalized;
-            transform.position += dir * moveSpeed * Time.deltaTime;
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), 6f * Time.deltaTime);
-        }
+    [ObserversRpc]
+    private void RpcFlashWhite()
+    {
+        if (IsServerStarted) return;
+        flashTimer = 0.15f;
+        SetColor(Color.white);
     }
 
     [Server]
@@ -92,17 +71,11 @@ public class SimpleZombie : NetworkBehaviour
         SetColor(new Color(0.9f, 0.15f, 0.1f));
         RpcFlash();
 
-        if (headshot)
-        {
-            Debug.Log("[Zombie] 人机丧尸被爆头击杀");
-            Die();
-            return;
-        }
-
-        health -= amount;
+        float dmg = headshot ? amount : amount; // 爆头倍率在 Gun 侧已处理
+        health -= dmg;
         if (health <= 0f)
         {
-            Debug.Log($"[Zombie] 人机丧尸被击杀 (hp<=0)");
+            Debug.Log("[Zombie] 人机丧尸被击杀");
             Die();
         }
     }

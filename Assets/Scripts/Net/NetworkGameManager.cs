@@ -23,9 +23,11 @@ public class NetworkGameManager : MonoBehaviour
     private readonly Dictionary<int, GameObject> players = new Dictionary<int, GameObject>();
     private int nextSpawnIndex;
     private bool autoTest;
+    private bool autoStart;
     private string requestedRole = "auto";
 
     public IReadOnlyCollection<GameObject> Players => players.Values;
+    public bool AutoStart => autoStart;
 
     private void Awake()
     {
@@ -65,11 +67,12 @@ public class NetworkGameManager : MonoBehaviour
         var args = System.Environment.GetCommandLineArgs();
         Debug.Log("[Net] Args: " + string.Join(" ", args));
 
-        // 第一遍：先扫描所有标记（-autotest / -role），再决定动作，避免 -join 提前 return 漏掉后续参数
+        // 第一遍：先扫描所有标记（-autotest / -role / -autostart），再决定动作，避免 -join 提前 return 漏掉后续参数
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i].ToLowerInvariant();
             if (a == "-autotest") autoTest = true;
+            else if (a == "-autostart") autoStart = true;
             else if (a == "-role" && i + 1 < args.Length) { requestedRole = args[i + 1].ToLowerInvariant(); i++; }
         }
 
@@ -142,11 +145,15 @@ public class NetworkGameManager : MonoBehaviour
     private void HandleRemoteState(NetworkConnection conn, RemoteConnectionStateArgs args)
     {
         if (args.ConnectionState == RemoteConnectionState.Started)
+        {
             conn.OnLoadedStartScenes += HandleLoadedStartScenes;
+        }
         else if (args.ConnectionState == RemoteConnectionState.Stopped)
         {
             conn.OnLoadedStartScenes -= HandleLoadedStartScenes;
             DespawnPlayer(conn);
+            var flow = FindObjectOfType<GameFlow>();
+            if (flow != null) flow.HandleClientLeft(conn);
         }
     }
 
@@ -154,7 +161,9 @@ public class NetworkGameManager : MonoBehaviour
     {
         if (!asServer) return;
         conn.OnLoadedStartScenes -= HandleLoadedStartScenes;
-        SpawnPlayer(conn);
+        var flow = FindObjectOfType<GameFlow>();
+        if (flow != null) flow.HandleClientReady(conn);
+        else Debug.LogWarning("[Net] 未找到 GameFlow，客户端不会出生");
     }
 
     private void HandleClientState(ClientConnectionStateArgs args)
@@ -165,22 +174,22 @@ public class NetworkGameManager : MonoBehaviour
             Debug.Log("[Net] 客户端已断开（若为版本不匹配请更新构建）");
     }
 
-    private void SpawnPlayer(NetworkConnection conn)
+    /// <summary>由 GameFlow 在开局时按角色生成玩家。</summary>
+    public void SpawnPlayerWithRole(NetworkConnection conn, HumanRole role, bool isZombie, Vector3 pos)
     {
         if (playerPrefab == null) { Debug.LogError("[Net] playerPrefab 未赋值"); return; }
-        if (spawnPoints == null || spawnPoints.Length == 0) return;
-
-        Vector3 pos = spawnPoints[nextSpawnIndex % spawnPoints.Length];
-        nextSpawnIndex++;
 
         var go = Instantiate(playerPrefab, pos, Quaternion.identity);
+        var rc = go.GetComponent<RoleComponent>();
+        if (rc != null) rc.Initialize(role, isZombie);
+
         var no = go.GetComponent<NetworkObject>();
         if (no != null) InstanceFinder.ServerManager.Spawn(no, conn);
         players[conn.ClientId] = go;
-        Debug.Log($"[Net] 服务器为客户端 {conn.ClientId} 生成玩家 at {pos} (总数 {players.Count})");
+        Debug.Log($"[Net] 开局生成 客户端{conn.ClientId} role={(isZombie ? "ZOMBIE" : role.ToString())} at {pos} (总数 {players.Count})");
     }
 
-    private void DespawnPlayer(NetworkConnection conn)
+    public void DespawnPlayer(NetworkConnection conn)
     {
         if (players.TryGetValue(conn.ClientId, out var go) && go != null)
         {

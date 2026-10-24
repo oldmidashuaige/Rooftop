@@ -45,6 +45,11 @@ public static class BuildPrefabs
 
         root.AddComponent<FirstPersonController>();
         root.AddComponent<PlayerHealth>();
+        root.AddComponent<RoleComponent>();
+        root.AddComponent<InfectionSystem>();
+        root.AddComponent<HumanAbilities>();
+        root.AddComponent<PlayerZombie>();
+        root.AddComponent<SpectatorLink>();
 
         var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         body.name = "Body";
@@ -52,6 +57,15 @@ public static class BuildPrefabs
         body.transform.localPosition = new Vector3(0f, 1f, 0f);
         Object.DestroyImmediate(body.GetComponent<Collider>());
         body.GetComponent<MeshRenderer>().sharedMaterial = mats.player;
+
+        // 丧尸形态的头部（供爆头判定；人类隐藏）
+        var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        head.name = "Head";
+        head.transform.SetParent(root.transform, false);
+        head.transform.localPosition = new Vector3(0f, 1.85f, 0f);
+        head.transform.localScale = Vector3.one * 0.45f;
+        head.GetComponent<MeshRenderer>().sharedMaterial = mats.zombieHead;
+        head.GetComponent<Collider>().isTrigger = true;
 
         var camGo = new GameObject("Camera");
         camGo.transform.SetParent(root.transform, false);
@@ -127,6 +141,7 @@ public static class BuildPrefabs
         head.GetComponent<MeshRenderer>().sharedMaterial = mats.zombieHead;
 
         root.AddComponent<SimpleZombie>();
+        root.AddComponent<HatredBrain>();
 
         PrefabUtility.SaveAsPrefabAsset(root, PrefabsFolder + "/Zombie.prefab");
         Object.DestroyImmediate(root);

@@ -38,6 +38,11 @@ public class Gun : NetworkBehaviour
         inputEnabled = IsOwner;
     }
 
+    public void SetEnabled(bool on)
+    {
+        inputEnabled = on && IsOwner;
+    }
+
     private void Update()
     {
         if (flashTimer > 0f)
@@ -107,6 +112,7 @@ public class Gun : NetworkBehaviour
         // Gun 挂在相机子物体上，transform.position 即眼睛位置
         Vector3 eye = transform.position;
         Vector3 end = eye + aim * range;
+        var myNo = GetComponentInParent<NetworkObject>();
 
         Ray ray = new Ray(eye, aim);
         RaycastHit[] hits = Physics.RaycastAll(ray, range, ~0, QueryTriggerInteraction.Ignore);
@@ -114,7 +120,9 @@ public class Gun : NetworkBehaviour
         RaycastHit chosen = default;
         for (int i = 0; i < hits.Length; i++)
         {
-            if (hits[i].collider.GetComponentInParent<FirstPersonController>() != null) continue;
+            // 跳过自己
+            var hitNo = hits[i].collider.GetComponentInParent<NetworkObject>();
+            if (hitNo != null && hitNo == myNo) continue;
             if (hits[i].distance < nearest)
             {
                 nearest = hits[i].distance;
@@ -127,10 +135,38 @@ public class Gun : NetworkBehaviour
         {
             end = chosen.point;
             bool headshot = chosen.collider.transform.name == "Head";
+            float dmg = headshot ? damage * headshotMultiplier : damage;
+
+            // 子弹可伤害人机丧尸与玩家丧尸；友伤可伤害人类
             var zombie = chosen.collider.GetComponentInParent<SimpleZombie>();
             if (zombie != null)
-                zombie.TakeDamage(headshot ? damage * headshotMultiplier : damage, headshot);
+            {
+                zombie.TakeDamage(dmg, headshot);
+            }
+            else
+            {
+                var rc = chosen.collider.GetComponentInParent<RoleComponent>();
+                if (rc != null)
+                {
+                    // 感染中不可被攻击
+                    var inf = rc.GetComponent<InfectionSystem>();
+                    if (inf == null || !inf.IsInfected)
+                    {
+                        var health = rc.GetComponent<PlayerHealth>();
+                        if (health != null)
+                        {
+                            health.TakeDamage(Mathf.RoundToInt(dmg));
+                            var sound = FindObjectOfType<SoundEvents>();
+                            if (sound != null) sound.NotifyGunshotHit(rc.transform.position);
+                        }
+                    }
+                }
+            }
         }
+
+        // 枪声事件（喂仇恨 + 玩家丧尸暴露指示）
+        var se = FindObjectOfType<SoundEvents>();
+        if (se != null) se.NotifyGunshot(eye, aim, Owner.ClientId);
 
         RpcFx(eye, end, didHit);
     }

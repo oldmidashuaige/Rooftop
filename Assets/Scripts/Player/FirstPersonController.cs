@@ -33,10 +33,24 @@ public class FirstPersonController : NetworkBehaviour
     private Vector3 velocity;
     private Vector3 moveVelocity;
     private bool inputEnabled;
+    private float cachedSpeedMultiplier = 1f;
 
     private bool hasLastPos;
     private Vector3 lastPos;
     private float stepAccum;
+    private float hitSlowTimer;
+
+    /// <summary>客户端：启用/禁用本地输入（感染僵直/尸体/观战）。</summary>
+    public void SetInputEnabled(bool on)
+    {
+        inputEnabled = on && IsOwner;
+    }
+
+    /// <summary>客户端：受猛烈攻击短暂减速。</summary>
+    public void ApplyHitSlow(float duration)
+    {
+        hitSlowTimer = duration;
+    }
 
     private void Awake()
     {
@@ -60,6 +74,15 @@ public class FirstPersonController : NetworkBehaviour
         inputEnabled = true;
         localYaw = transform.eulerAngles.y;
 
+        var rc = GetComponent<RoleComponent>();
+        float bonus = 1f;
+        if (rc != null)
+        {
+            bonus += RoleDef.SpeedBonus(rc.Role);
+            if (rc.IsZombie) bonus *= 1.25f; // 玩家丧尸约 125% 人类移速
+        }
+        cachedSpeedMultiplier = bonus;
+
         var body = transform.Find("Body");
         if (body != null)
             foreach (var r in body.GetComponentsInChildren<Renderer>())
@@ -81,6 +104,11 @@ public class FirstPersonController : NetworkBehaviour
         if (!IsOwner || !inputEnabled) return;
 
         if (Keyboard.current == null) return;
+
+        var role = GetComponent<RoleComponent>();
+        if (role != null && role.IsStunned) return; // 紫外灯僵直（玩家丧尸）
+
+        if (hitSlowTimer > 0f) hitSlowTimer -= Time.deltaTime;
 
         if (Keyboard.current.escapeKey.wasPressedThisFrame)
         {
@@ -143,7 +171,8 @@ public class FirstPersonController : NetworkBehaviour
 
         float dirFactor = Mathf.Lerp(backwardFactor, forwardFactor, (input.y + 1f) * 0.5f);
         if (Mathf.Abs(input.x) > 0.01f) dirFactor *= strafeFactor;
-        float speed = (run ? runSpeed : walkSpeed) * dirFactor;
+        float speed = (run ? runSpeed : walkSpeed) * dirFactor * cachedSpeedMultiplier;
+        if (hitSlowTimer > 0f) speed *= 0.55f;
         Vector3 desired = (transform.right * input.x + transform.forward * input.y) * speed;
         float rate = input.sqrMagnitude > 0f ? acceleration : deceleration;
         moveVelocity = Vector3.MoveTowards(moveVelocity, desired, rate * dt);
@@ -180,6 +209,9 @@ public class FirstPersonController : NetworkBehaviour
         {
             stepAccum = 0f;
             RpcPlayStep(run);
+            // 服务器声音事件：喂给仇恨系统 + 播 3D 音效
+            var se = FindObjectOfType<SoundEvents>();
+            if (se != null && Owner != null) se.NotifyStep(transform.position, Owner.ClientId, run);
         }
     }
 
