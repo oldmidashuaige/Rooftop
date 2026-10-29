@@ -20,6 +20,7 @@ public class Door : NetworkBehaviour
     private readonly SyncVar<bool> isNormal = new();
 
     private Transform panel;
+    private Collider solidCollider;
     private bool prying;
 
     public bool IsOpen => isOpen.Value;
@@ -30,6 +31,21 @@ public class Door : NetworkBehaviour
     {
         var t = transform.Find("Panel");
         if (t != null) panel = t;
+
+        // 实体碰撞体：优先用烘焙的 Solid 子物体；缺失时运行时自建（兼容旧场景）
+        var s = transform.Find("Solid");
+        if (s != null) solidCollider = s.GetComponent<Collider>();
+        if (solidCollider == null)
+        {
+            var so = new GameObject("Solid");
+            so.transform.SetParent(transform, false);
+            so.transform.localPosition = new Vector3(0f, 1.2f, 0f);
+            var bc = so.AddComponent<BoxCollider>();
+            bc.size = new Vector3(1f, 2.4f, 0.12f);
+            bc.isTrigger = false;
+            solidCollider = bc;
+        }
+
         isOpen.OnChange += OnOpenChanged;
         isLocked.OnChange += OnLockChanged;
     }
@@ -38,11 +54,13 @@ public class Door : NetworkBehaviour
     {
         base.OnStartServer();
         isLocked.Value = startLocked;
+        UpdateSolidCollider();
     }
 
     public override void OnStartClient()
     {
         base.OnStartClient();
+        UpdateSolidCollider();
         ApplyVisual();
     }
 
@@ -93,18 +111,24 @@ public class Door : NetworkBehaviour
         Debug.Log("[Door] 上锁门被撬成普通门（永久可开）");
     }
 
-    // ============ 客户端视觉 ============
+    // ============ 客户端视觉 / 碰撞 ============
 
     private void OnOpenChanged(bool _, bool __, bool asServer)
     {
-        if (asServer) return;
-        ApplyVisual();
+        // 服务器与客户端都要更新实体碰撞（关=挡路，开=放行）
+        UpdateSolidCollider();
+        if (!asServer) ApplyVisual();
     }
 
     private void OnLockChanged(bool _, bool __, bool asServer)
     {
         if (asServer) return;
         ApplyVisual();
+    }
+
+    private void UpdateSolidCollider()
+    {
+        if (solidCollider != null) solidCollider.enabled = !isOpen.Value;
     }
 
     private void ApplyVisual()

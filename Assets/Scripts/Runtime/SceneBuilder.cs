@@ -77,7 +77,7 @@ public static class SceneBuilder
         frameCol.size = new Vector3(1.1f, 2.4f, 0.2f);
         frameCol.isTrigger = true;
 
-        // 门板（动画旋转用）
+        // 门板（动画旋转用，纯视觉，无碰撞）
         var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
         panel.name = "Panel";
         panel.transform.SetParent(go.transform, false);
@@ -86,6 +86,14 @@ public static class SceneBuilder
         panel.GetComponent<MeshRenderer>().sharedMaterial = mat;
         var pc = panel.GetComponent<Collider>();
         if (pc != null) Object.DestroyImmediate(pc);
+
+        // 实体碰撞体（关闭时挡路，开门时由 Door 禁用）
+        var solid = new GameObject("Solid");
+        solid.transform.SetParent(go.transform, false);
+        solid.transform.localPosition = new Vector3(0f, 1.2f, 0f);
+        var solidCol = solid.AddComponent<BoxCollider>();
+        solidCol.size = new Vector3(1f, 2.4f, 0.12f);
+        solidCol.isTrigger = false;
 
         // 触发区域（检测进门）
         var trigger = new GameObject("Trigger");

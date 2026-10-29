@@ -72,6 +72,7 @@ public static class BuildPrefabs
         camGo.transform.SetParent(root.transform, false);
         camGo.transform.localPosition = new Vector3(0f, 1.65f, 0f);
         camGo.transform.localRotation = Quaternion.identity;
+        camGo.tag = "MainCamera"; // 玩家相机设为主相机，Camera.main 才能指向它
         camGo.AddComponent<Camera>();
         camGo.AddComponent<AudioListener>();
         var gun = camGo.AddComponent<Gun>();

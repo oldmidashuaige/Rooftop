@@ -26,7 +26,7 @@ public class HumanAbilities : NetworkBehaviour
     {
         if (!IsOwner || !enabledByRole) return;
         if (Keyboard.current == null) return;
-        if (Cursor.lockState != CursorLockMode.Locked) return;
+        // 交互(E)等键盘动作不依赖鼠标锁定状态，保证任何情况下可用
 
         if (GameInput.WasPressed(SettingsStore.S.keyInteract))
             TryInteract();

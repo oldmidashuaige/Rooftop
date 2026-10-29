@@ -71,6 +71,21 @@ public class NetworkGameManager : MonoBehaviour
         }
     }
 
+    /// <summary>玩家出生后禁用菜单相机，让 Camera.main 指向玩家相机（交互射线从玩家视角发出）。</summary>
+    public void OnLocalPlayerSpawned()
+    {
+        foreach (var c in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+        {
+            if (c.GetComponentInParent<NetworkObject>() != null) continue; // 玩家相机保留
+            if (c.CompareTag("MainCamera")) // 菜单相机
+            {
+                c.enabled = false;
+                var al = c.GetComponent<AudioListener>();
+                if (al != null) al.enabled = false;
+            }
+        }
+    }
+
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;

@@ -100,6 +100,10 @@ public class FirstPersonController : NetworkBehaviour
             foreach (var r in body.GetComponentsInChildren<Renderer>())
                 r.enabled = false;
 
+        // 禁用菜单相机，让 Camera.main 正确指向玩家相机（否则交互射线会从菜单相机发出）
+        var menu = FindObjectOfType<NetworkGameManager>();
+        if (menu != null) menu.OnLocalPlayerSpawned();
+
         Debug.Log("[Net] 客户端本地玩家已出生");
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
