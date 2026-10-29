@@ -64,6 +64,27 @@ public class NetworkGameManager : MonoBehaviour
         InstanceFinder.ClientManager.OnClientConnectionState -= HandleClientState;
     }
 
+    /// <summary>
+    /// 应用退出前优雅停机：此时所有对象还活着，先停服务器/客户端连接，
+    /// 让 FishNet 的停止回调干净执行（遍历 Spawned/NetworkBehaviours），
+    /// 避免随后 Tugboat.OnDestroy→Shutdown 时遍历已被销毁的对象抛 NullReferenceException。
+    /// </summary>
+    private void OnApplicationQuit()
+    {
+        if (InstanceFinder.NetworkManager == null) return;
+        try
+        {
+            if (InstanceFinder.ServerManager != null)
+                InstanceFinder.ServerManager.StopConnection(false);
+            if (InstanceFinder.ClientManager != null)
+                InstanceFinder.ClientManager.StopConnection();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning("[Net] 退出清理异常（可忽略）: " + e.Message);
+        }
+    }
+
     private void ParseCommandLine()
     {
         var args = System.Environment.GetCommandLineArgs();
