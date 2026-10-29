@@ -107,12 +107,11 @@ public class PauseMenu : MonoBehaviour
 
     private void ExitToMenu()
     {
-        Resume();
-        var nm = InstanceFinder.NetworkManager;
-        if (nm == null) return;
-        if (nm.IsServerStarted) nm.ServerManager.StopConnection(false);
-        if (nm.IsClientStarted) nm.ClientManager.StopConnection();
-        // 断开后 HandleClientState 会重新显示主菜单
-        Debug.Log("[Pause] 退出到主菜单");
+        // 直接隐藏暂停界面（不调用 Resume，避免把鼠标锁回 Locked）
+        paused = false;
+        if (root != null) root.SetActive(false);
+
+        // 停服务器+客户端、重置 GameFlow、解锁鼠标（训练场退出即结束训练场服务器）
+        if (NetworkGameManager.Instance != null) NetworkGameManager.Instance.DisconnectToMenu();
     }
 }

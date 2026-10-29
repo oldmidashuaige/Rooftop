@@ -158,6 +158,25 @@ public class NetworkGameManager : MonoBehaviour
         HostGame();
     }
 
+    /// <summary>
+    /// 退出到主菜单（含关闭训练场）：停服务器+客户端、重置 GameFlow 状态、解锁鼠标。
+    /// 必须重置 GameFlow，否则再进训练场 state 仍为 Playing，玩家不会生成、鼠标无法锁定。
+    /// </summary>
+    public void DisconnectToMenu()
+    {
+        var nm = InstanceFinder.NetworkManager;
+        if (nm != null)
+        {
+            if (nm.IsServerStarted) nm.ServerManager.StopConnection(false);
+            if (nm.IsClientStarted) nm.ClientManager.StopConnection();
+        }
+        var flow = FindObjectOfType<GameFlow>();
+        if (flow != null) flow.ResetToLobby();
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        Debug.Log("[Net] 已退出到主菜单（训练场服务器已结束）");
+    }
+
     private ushort EffectivePort() => hasPortOverride ? portOverride : DefaultPort;
 
     public void HostGame()

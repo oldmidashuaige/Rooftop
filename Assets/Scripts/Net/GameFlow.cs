@@ -137,6 +137,28 @@ public class GameFlow : MonoBehaviour
     {
         lobby.Remove(conn.ClientId);
         boarded.Remove(conn.ClientId);
+        // 没人了 → 回大厅（含训练场退出：保证再次进入能正常开局）
+        if (lobby.Count == 0 && state != RoundState.Lobby)
+            ResetToLobby();
+        if (InstanceFinder.IsServerStarted) BroadcastLobbyState();
+    }
+
+    /// <summary>重置回大厅：清空名单/状态，保证退出训练场后再次进入能重新开局。</summary>
+    public void ResetToLobby()
+    {
+        state = RoundState.Lobby;
+        lobbyFullTime = -1f;
+        boarded.Clear();
+        seatsTaken = 0;
+        resultText = "";
+        foreach (var kv in lobby)
+        {
+            kv.Value.role = HumanRole.None;
+            kv.Value.isZombie = false;
+            kv.Value.ready = false;
+        }
+        lobby.Clear();
+        Debug.Log("[Flow] 已重置回大厅");
         if (InstanceFinder.IsServerStarted) BroadcastLobbyState();
     }
 
