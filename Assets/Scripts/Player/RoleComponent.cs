@@ -192,10 +192,22 @@ public class RoleComponent : NetworkBehaviour
 
         var cc = GetComponent<CharacterController>();
         if (cc != null) cc.enabled = false;
+        EnsureCorpseCollider();
         transform.rotation = Quaternion.Euler(-90f, transform.eulerAngles.y, 0f);
 
         var spectator = GetComponent<SpectatorLink>();
         if (spectator != null) spectator.EnterSpectator(corpseWasZombie.Value);
+    }
+
+    /// <summary>尸体需有碰撞体，供玩家丧尸"啃咬尸体"的射线命中。</summary>
+    private void EnsureCorpseCollider()
+    {
+        if (GetComponent<Collider>() == null)
+        {
+            var col = gameObject.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.9f, 0f);
+            col.size = new Vector3(0.7f, 1.8f, 0.7f);
+        }
     }
 
     /// <summary>同对象转为玩家丧尸（感染完成 / 尸体被啃）。</summary>
@@ -254,6 +266,7 @@ public class RoleComponent : NetworkBehaviour
 
         var cc = GetComponent<CharacterController>();
         if (cc != null) cc.enabled = false;
+        EnsureCorpseCollider();
         transform.rotation = Quaternion.Euler(-90f, transform.eulerAngles.y, 0f);
     }
 }

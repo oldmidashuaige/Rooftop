@@ -51,7 +51,8 @@ public class HumanAbilities : NetworkBehaviour
         if (rc == null || !Camera.main) return;
         var cam = Camera.main.transform;
 
-        if (!Physics.Raycast(cam.position, cam.forward, out RaycastHit hit, 3.5f)) return;
+        // QueryTriggerInteraction.Collide：门的交互碰撞体是 Trigger，默认 Raycast 忽略
+        if (!Physics.Raycast(cam.position, cam.forward, out RaycastHit hit, 3.5f, ~0, QueryTriggerInteraction.Collide)) return;
 
         var door = hit.collider.GetComponentInParent<Door>();
         if (door != null)
@@ -72,7 +73,7 @@ public class HumanAbilities : NetworkBehaviour
     {
         var rc = GetComponent<RoleComponent>();
         if (rc == null || !Camera.main) return;
-        if (!Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out RaycastHit hit, cfg.uvRange)) return;
+        if (!Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out RaycastHit hit, cfg.uvRange, ~0, QueryTriggerInteraction.Collide)) return;
 
         // 命中人机丧尸或玩家丧尸
         var zombie = hit.collider.GetComponentInParent<SimpleZombie>();
@@ -94,7 +95,7 @@ public class HumanAbilities : NetworkBehaviour
             return;
         }
         if (!Camera.main) return;
-        if (Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out RaycastHit hit, 6f))
+        if (Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out RaycastHit hit, 6f, ~0, QueryTriggerInteraction.Collide))
         {
             var targetInf = hit.collider.GetComponentInParent<InfectionSystem>();
             if (targetInf != null)

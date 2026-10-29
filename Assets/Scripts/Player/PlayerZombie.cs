@@ -92,7 +92,7 @@ public class PlayerZombie : NetworkBehaviour
     {
         if (Camera.main == null) return null;
         var cam = Camera.main.transform;
-        if (!Physics.Raycast(cam.position, cam.forward, out RaycastHit hit, meleeRange + 20f)) return null;
+        if (!Physics.Raycast(cam.position, cam.forward, out RaycastHit hit, meleeRange + 20f, ~0, QueryTriggerInteraction.Collide)) return null;
         var rc = hit.collider.GetComponentInParent<RoleComponent>();
         if (rc == null || rc.IsCorpse != corpseOnly) return null;
         if (corpseOnly) return rc;
