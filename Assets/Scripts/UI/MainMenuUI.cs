@@ -94,14 +94,14 @@ public class MainMenuUI : MonoBehaviour
         portField = UIKit.Input("portInput", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
             new Vector2(400f, -368f), new Vector2(520f, -336f), "7770");
 
-        // 按钮
+        // 按钮（在输入框下方留足间距：输入框底 368 → 按钮顶 400，32px 空隙）
         UIKit.CutButton("btnHost", root.transform, "创建房间 · 房主", new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(60f, -400f), new Vector2(420f, -354f), () =>
+            new Vector2(60f, -446f), new Vector2(420f, -400f), () =>
             {
                 if (NetworkGameManager.Instance != null) NetworkGameManager.Instance.HostGame();
             });
         UIKit.CutButton("btnJoin", root.transform, "加入房间", new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(60f, -470f), new Vector2(420f, -424f), () =>
+            new Vector2(60f, -512f), new Vector2(420f, -466f), () =>
             {
                 if (NetworkGameManager.Instance == null) return;
                 ushort port = 7770;
@@ -109,7 +109,7 @@ public class MainMenuUI : MonoBehaviour
                 NetworkGameManager.Instance.JoinGame(ipField.text, port);
             });
         UIKit.CutButton("btnServer", root.transform, "启动专用服务器（本机测试）", new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(60f, -540f), new Vector2(420f, -494f), () =>
+            new Vector2(60f, -578f), new Vector2(420f, -532f), () =>
             {
                 if (NetworkGameManager.Instance != null) NetworkGameManager.Instance.StartDedicatedServer();
             });
@@ -119,8 +119,8 @@ public class MainMenuUI : MonoBehaviour
             EndfieldTheme.Signal, TextAnchor.MiddleLeft);
         statusText.rectTransform.anchorMin = new Vector2(0f, 1f);
         statusText.rectTransform.anchorMax = new Vector2(0f, 1f);
-        statusText.rectTransform.offsetMin = new Vector2(60f, -620f);
-        statusText.rectTransform.offsetMax = new Vector2(500f, -580f);
+        statusText.rectTransform.offsetMin = new Vector2(60f, -650f);
+        statusText.rectTransform.offsetMax = new Vector2(500f, -610f);
 
         // 版尾字段（参考高度 1080，锚点贴底）
         var foot = UIKit.Text("foot", root.transform, "AGPL-3.0  │  FishNet 4.7  │  URP 17.6",
