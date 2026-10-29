@@ -142,8 +142,7 @@ public static class UIKit
     }
 
     /// <summary>可点击切角按钮（chip 底，hover/按下 擦入强调色，文字切墨色）。</summary>
-    public static RectTransform CutButton(string name, Transform parent, string label,
-        Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax,
+    public static RectTransform CutButton(string name, Transform parent, string label,        Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax,
         UnityAction onClick, int fontSize = 18)
     {
         var rt = NewRect(name, parent);
@@ -182,8 +181,7 @@ public static class UIKit
     }
 
     /// <summary>输入框：chip 底 + InputField + 子 Text（宽体）。</summary>
-    public static InputField Input(string name, Transform parent,
-        Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax,
+    public static InputField Input(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax,
         string initial, int fontSize = 16)
     {
         var rt = NewRect(name, parent);
@@ -217,6 +215,71 @@ public static class UIKit
         field.textComponent = text;
 
         return field;
+    }
+
+    /// <summary>
+    /// 可滚动视图：viewport(带 RectMask2D + ScrollRect) + content + 右侧纵向滚动条。
+    /// 返回 (viewport, content, scrollbar)。向 content 添加子元素（锚点 (0,1) 从顶向下），
+    /// 最后设置 content.sizeDelta.y = 内容总高。
+    /// </summary>
+    public static (RectTransform viewport, RectTransform content, Scrollbar scrollbar) ScrollView(
+        string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax,
+        float scrollbarWidth = 14f)
+    {
+        var viewport = NewRect(name, parent);
+        viewport.anchorMin = anchorMin;
+        viewport.anchorMax = anchorMax;
+        viewport.offsetMin = offsetMin;
+        viewport.offsetMax = offsetMax;
+        var vImg = viewport.gameObject.AddComponent<Image>();
+        vImg.color = Color.clear;
+        vImg.raycastTarget = true;
+        viewport.gameObject.AddComponent<RectMask2D>();
+        var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.scrollSensitivity = 30f;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+
+        var content = NewRect("content", viewport);
+        content.anchorMin = new Vector2(0f, 1f);
+        content.anchorMax = new Vector2(1f, 1f);
+        content.pivot = new Vector2(0.5f, 1f);
+        content.anchoredPosition = Vector2.zero;
+        content.sizeDelta = new Vector2(0f, 100f);
+        scroll.content = content;
+
+        // 右侧纵向滚动条
+        var sbRT = NewRect("scrollbar", parent);
+        sbRT.anchorMin = new Vector2(1f, 0f);
+        sbRT.anchorMax = new Vector2(1f, 1f);
+        sbRT.offsetMin = new Vector2(-scrollbarWidth, 0f);
+        sbRT.offsetMax = new Vector2(0f, 0f);
+        var sbBg = sbRT.gameObject.AddComponent<Image>();
+        sbBg.color = new Color(EndfieldTheme.Rule.r, EndfieldTheme.Rule.g, EndfieldTheme.Rule.b, 0.6f);
+        var scrollbar = sbRT.gameObject.AddComponent<Scrollbar>();
+        scrollbar.direction = Scrollbar.Direction.BottomToTop;
+
+        var sliding = NewRect("sliding", sbRT);
+        sliding.anchorMin = Vector2.zero;
+        sliding.anchorMax = Vector2.one;
+        sliding.offsetMin = Vector2.zero;
+        sliding.offsetMax = Vector2.zero;
+
+        var handle = NewRect("handle", sliding);
+        handle.anchorMin = new Vector2(0f, 0f);
+        handle.anchorMax = new Vector2(1f, 1f);
+        handle.offsetMin = new Vector2(2f, 2f);
+        handle.offsetMax = new Vector2(-2f, -2f);
+        var hImg = handle.gameObject.AddComponent<Image>();
+        hImg.color = EndfieldTheme.Signal;
+        scrollbar.handleRect = handle;
+        scrollbar.targetGraphic = hImg;
+
+        scroll.verticalScrollbar = scrollbar;
+        scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+
+        return (viewport, content, scrollbar);
     }
 }
 

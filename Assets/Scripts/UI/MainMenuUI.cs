@@ -45,7 +45,7 @@ public class MainMenuUI : MonoBehaviour
         }
         else if (args.ConnectionState == LocalConnectionState.Stopped)
         {
-            SetStatus("已断开（版本不匹配？）");
+            SetStatus("连接失败：可能是版本不对或地址错误");
             if (root != null) root.SetActive(true);
         }
     }
@@ -75,6 +75,13 @@ public class MainMenuUI : MonoBehaviour
             new Vector2(0f, -40f), new Vector2(0f, -37f), EndfieldTheme.Signal);
         UIKit.Panel("triC", root.transform, new Vector2(2f / 3f, 1f), new Vector2(1f, 1f),
             new Vector2(0f, -40f), new Vector2(0f, -37f), EndfieldTheme.ParseHex("00FFA2"));
+
+        // 右上角：设置按钮
+        UIKit.CutButton("btnSettings", root.transform, "设 置", new Vector2(1f, 1f), new Vector2(1f, 1f),
+            new Vector2(-180f, -56f), new Vector2(-40f, -16f), () =>
+            {
+                SettingsPanel.Ensure();
+            }, 16);
 
         // 眉标 / 大标题 / 副标题
         UILabel("// PROJECT.ROOFTOP", EndfieldTheme.Ink2, EndfieldTheme.UIFont, 13, FontStyle.Bold, 60, 150, 400, 18);
@@ -113,14 +120,19 @@ public class MainMenuUI : MonoBehaviour
             {
                 if (NetworkGameManager.Instance != null) NetworkGameManager.Instance.StartDedicatedServer();
             });
+        UIKit.CutButton("btnTrain", root.transform, "训练场（单人）", new Vector2(0f, 1f), new Vector2(0f, 1f),
+            new Vector2(60f, -644f), new Vector2(420f, -598f), () =>
+            {
+                if (NetworkGameManager.Instance != null) NetworkGameManager.Instance.StartTraining();
+            });
 
-        // 状态
+        // 状态（右侧，避免与左侧按钮/输入重叠）
         statusText = UIKit.Text("status", root.transform, "", 15, EndfieldTheme.CJKFont, FontStyle.Normal,
-            EndfieldTheme.Signal, TextAnchor.MiddleLeft);
-        statusText.rectTransform.anchorMin = new Vector2(0f, 1f);
-        statusText.rectTransform.anchorMax = new Vector2(0f, 1f);
-        statusText.rectTransform.offsetMin = new Vector2(60f, -650f);
-        statusText.rectTransform.offsetMax = new Vector2(500f, -610f);
+            EndfieldTheme.Signal, TextAnchor.MiddleRight);
+        statusText.rectTransform.anchorMin = new Vector2(1f, 1f);
+        statusText.rectTransform.anchorMax = new Vector2(1f, 1f);
+        statusText.rectTransform.offsetMin = new Vector2(-700f, -650f);
+        statusText.rectTransform.offsetMax = new Vector2(-40f, -610f);
 
         // 版尾字段（参考高度 1080，锚点贴底）
         var foot = UIKit.Text("foot", root.transform, "AGPL-3.0  │  FishNet 4.7  │  URP 17.6",

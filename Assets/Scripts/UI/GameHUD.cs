@@ -42,22 +42,20 @@ public class GameHUD : MonoBehaviour
         var canvas = UIKit.CreateCanvas("GameHUDCanvas", 50);
         root = canvas.gameObject;
 
-        // 准星
-        float c = Screen.width * 0.5f;
-        Crosshair("chN", c - 1f, Screen.height * 0.5f - 10f, 2f, 6f);
-        Crosshair("chS", c - 1f, Screen.height * 0.5f + 4f, 2f, 6f);
-        Crosshair("chW", c - 10f, Screen.height * 0.5f - 1f, 6f, 2f);
-        Crosshair("chE", c + 4f, Screen.height * 0.5f - 1f, 6f, 2f);
+        // 准星改用独立组件 Crosshair（由 FirstPersonController 创建，设置可调）
+        Crosshair.Ensure();
 
-        // 命中标记
-        var hm = UIKit.Panel("hitMarker", root.transform, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero, EndfieldTheme.Signal);
+        // 命中标记（严格居中于屏幕中心）
+        var hm = UIKit.Panel("hitMarker", root.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            Vector2.zero, Vector2.zero, EndfieldTheme.Signal);
         hitMarker = hm;
         hm.gameObject.SetActive(false);
-        hm.anchoredPosition = new Vector2(c, Screen.height * 0.5f);
-        AddSegment(hm, -10f, -10f, 6f, 2f);
-        AddSegment(hm, 4f, -10f, 6f, 2f);
-        AddSegment(hm, -10f, 8f, 6f, 2f);
-        AddSegment(hm, 4f, 8f, 6f, 2f);
+        hm.anchoredPosition = Vector2.zero;
+        hm.sizeDelta = Vector2.zero;
+        AddSegment(hm, -11f, -11f, 6f, 2f);
+        AddSegment(hm, 5f, -11f, 6f, 2f);
+        AddSegment(hm, -11f, 5f, 6f, 2f);
+        AddSegment(hm, 5f, 5f, 6f, 2f);
 
         // 角色信息（左上）
         var role = UIKit.Panel("role", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
@@ -122,14 +120,6 @@ public class GameHUD : MonoBehaviour
         resultText.rectTransform.anchoredPosition = Vector2.zero;
         resultText.rectTransform.sizeDelta = new Vector2(900f, 100f);
         resultText.gameObject.SetActive(false);
-    }
-
-    private void Crosshair(string name, float x, float y, float w, float h)
-    {
-        var rt = UIKit.Panel(name, root.transform, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero, EndfieldTheme.Ink);
-        rt.anchoredPosition = new Vector2(x, y);
-        rt.sizeDelta = new Vector2(w, h);
-        rt.GetComponent<Image>().raycastTarget = false;
     }
 
     private void AddSegment(RectTransform parent, float x, float y, float w, float h)
@@ -197,12 +187,7 @@ public class GameHUD : MonoBehaviour
     /// <summary>是否有枪（人类=显示准星；丧尸/尸体=隐藏准星）。</summary>
     public void SetHasGun(bool on)
     {
-        if (root == null) return;
-        foreach (var seg in root.GetComponentsInChildren<RectTransform>(true))
-        {
-            if (seg.name == "chN" || seg.name == "chS" || seg.name == "chW" || seg.name == "chE")
-                seg.gameObject.SetActive(on);
-        }
+        if (Crosshair.Instance != null) Crosshair.Instance.SetVisible(on);
     }
 
     public void OnHitMarker()

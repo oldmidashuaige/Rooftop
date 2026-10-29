@@ -50,6 +50,7 @@ public static class BuildPrefabs
         root.AddComponent<HumanAbilities>();
         root.AddComponent<PlayerZombie>();
         root.AddComponent<SpectatorLink>();
+        root.AddComponent<NameTag>();
 
         var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         body.name = "Body";

@@ -28,7 +28,7 @@ public class HumanAbilities : NetworkBehaviour
         if (Keyboard.current == null) return;
         if (Cursor.lockState != CursorLockMode.Locked) return;
 
-        if (Keyboard.current.eKey.wasPressedThisFrame)
+        if (GameInput.WasPressed(SettingsStore.S.keyInteract))
             TryInteract();
 
         var rc = GetComponent<RoleComponent>();
@@ -36,9 +36,9 @@ public class HumanAbilities : NetworkBehaviour
 
         if (RoleDef.IsDoctor(rc.Role))
         {
-            if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
+            if (GameInput.WasPressed(SettingsStore.S.keyUv))
                 TryUseUV();
-            if (Keyboard.current.gKey.wasPressedThisFrame)
+            if (GameInput.WasPressed(SettingsStore.S.keySerum))
                 TryUseSerum();
         }
     }

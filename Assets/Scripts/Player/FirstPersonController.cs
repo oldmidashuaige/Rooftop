@@ -24,6 +24,8 @@ public class FirstPersonController : NetworkBehaviour
     public Transform cameraTransform;
 
     public static bool AutoMove;
+    /// <summary>本地（owner）玩家实例，供 PauseMenu 等使用。</summary>
+    public static FirstPersonController Local;
 
     public float CurrentSpeed => moveVelocity.magnitude;
 
@@ -45,6 +47,11 @@ public class FirstPersonController : NetworkBehaviour
     {
         inputEnabled = on && IsOwner;
     }
+
+    /// <summary>读取设置键位：该键当前是否按下。</summary>
+    private bool KeyDown(int field) => GameInput.IsDown(field);
+
+    private bool KeyPressed(int field) => GameInput.WasPressed(field);
 
     /// <summary>客户端：受猛烈攻击短暂减速。</summary>
     public void ApplyHitSlow(float duration)
@@ -71,8 +78,13 @@ public class FirstPersonController : NetworkBehaviour
             return;
         }
 
+        Local = this;
         inputEnabled = true;
         localYaw = transform.eulerAngles.y;
+
+        // 游戏内 UI：准星 + 暂停菜单
+        Crosshair.Ensure();
+        PauseMenu.Ensure();
 
         var rc = GetComponent<RoleComponent>();
         float bonus = 1f;
@@ -96,6 +108,7 @@ public class FirstPersonController : NetworkBehaviour
     public override void OnStopClient()
     {
         base.OnStopClient();
+        if (Local == this) Local = null;
         inputEnabled = false;
     }
 
@@ -110,16 +123,10 @@ public class FirstPersonController : NetworkBehaviour
 
         if (hitSlowTimer > 0f) hitSlowTimer -= Time.deltaTime;
 
-        if (Keyboard.current.escapeKey.wasPressedThisFrame)
-        {
-            bool locked = Cursor.lockState == CursorLockMode.Locked;
-            Cursor.lockState = locked ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible = locked;
-        }
-
         if (Mouse.current != null && Cursor.lockState == CursorLockMode.Locked)
         {
-            Vector2 delta = Mouse.current.delta.ReadValue() * mouseSensitivity;
+            float sens = SettingsStore.S.mouseSensitivity;
+            Vector2 delta = Mouse.current.delta.ReadValue() * sens;
             localYaw += delta.x;
             localPitch = Mathf.Clamp(localPitch - delta.y, -85f, 85f);
             transform.rotation = Quaternion.Euler(0f, localYaw, 0f);
@@ -127,7 +134,7 @@ public class FirstPersonController : NetworkBehaviour
                 cameraTransform.localRotation = Quaternion.Euler(localPitch, 0f, 0f);
         }
 
-        if (cc.isGrounded && Keyboard.current.spaceKey.wasPressedThisFrame)
+        if (cc.isGrounded && KeyPressed(SettingsStore.S.keyJump))
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
     }
 
@@ -157,14 +164,15 @@ public class FirstPersonController : NetworkBehaviour
         {
             if (Keyboard.current == null) return;
 
+            var s = SettingsStore.S;
             input = Vector2.zero;
-            if (Keyboard.current.wKey.isPressed) input.y += 1f;
-            if (Keyboard.current.sKey.isPressed) input.y -= 1f;
-            if (Keyboard.current.dKey.isPressed) input.x += 1f;
-            if (Keyboard.current.aKey.isPressed) input.x -= 1f;
+            if (KeyDown(s.keyForward)) input.y += 1f;
+            if (KeyDown(s.keyBack)) input.y -= 1f;
+            if (KeyDown(s.keyRight)) input.x += 1f;
+            if (KeyDown(s.keyLeft)) input.x -= 1f;
             if (input.sqrMagnitude > 1f) input.Normalize();
 
-            run = Keyboard.current.leftShiftKey.isPressed;
+            run = KeyDown(s.keyRun);
         }
 
         transform.rotation = Quaternion.Euler(0f, localYaw, 0f);

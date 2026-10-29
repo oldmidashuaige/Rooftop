@@ -85,12 +85,52 @@ public class GameFlow : MonoBehaviour
 
     public void HandleClientReady(NetworkConnection conn)
     {
+        // 训练场：房主本地玩家就绪即直接开局（跳过选角大厅）
+        if (NetworkGameManager.Instance != null && NetworkGameManager.Instance.TrainingMode && state == RoundState.Lobby)
+        {
+            lobby[conn.ClientId] = new LobbyEntry { conn = conn, ready = true, isZombie = false, role = HumanRole.Student };
+            Debug.Log("[Flow] 训练场：直接开局");
+            StartTrainingRound();
+            return;
+        }
+
         if (!lobby.ContainsKey(conn.ClientId))
             lobby[conn.ClientId] = new LobbyEntry { conn = conn };
         lobby[conn.ClientId].ready = true;
         Debug.Log($"[Flow] 客户端 {conn.ClientId} 就绪 (lobby={lobby.Count})");
         if (InstanceFinder.IsServerStarted) BroadcastLobbyState();
         MaybeAutoStart();
+    }
+
+    /// <summary>训练场：为本机玩家生成角色（学生），并保证有人机丧尸可练手。</summary>
+    private void StartTrainingRound()
+    {
+        if (state != RoundState.Lobby) return;
+        state = RoundState.Playing;
+        lobbyFullTime = -1f;
+        boarded.Clear();
+        seatsTaken = 0;
+        resultText = "";
+        Debug.Log("[Flow] 训练场开局！");
+
+        try
+        {
+            foreach (var kv in lobby)
+            {
+                var nm = NetworkGameManager.Instance;
+                if (nm == null) continue;
+                nm.SpawnPlayerWithRole(kv.Value.conn, HumanRole.Student, false, PickSpawn(kv.Value));
+            }
+            // 训练场刷几只人机丧尸供练手
+            var spawner = FindObjectOfType<ZombieSpawner>();
+            if (spawner != null) spawner.maxZombies = 4;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[Flow] 训练场开局异常: {e}");
+        }
+        BroadcastRoundState();
+        BroadcastLobbyState();
     }
 
     public void HandleClientLeft(NetworkConnection conn)

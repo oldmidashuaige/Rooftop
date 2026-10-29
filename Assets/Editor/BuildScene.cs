@@ -30,6 +30,11 @@ public static class BuildScene
         menuGo.AddComponent<MainMenuUI>();
         SceneBuilder.MarkLocal(menuGo);
 
+        // 启动登录界面（离线，输入用户名；服务器 batchmode 自动跳过）
+        var loginGo = new GameObject("Login");
+        loginGo.AddComponent<LoginUI>();
+        SceneBuilder.MarkLocal(loginGo);
+
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
 

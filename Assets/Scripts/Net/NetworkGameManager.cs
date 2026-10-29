@@ -27,9 +27,11 @@ public class NetworkGameManager : MonoBehaviour
     private bool autoTest;
     private bool autoStart;
     private string requestedRole = "auto";
+    private bool trainingMode;
 
     public IReadOnlyCollection<GameObject> Players => players.Values;
     public bool AutoStart => autoStart;
+    public bool TrainingMode => trainingMode;
 
     private void Awake()
     {
@@ -43,6 +45,9 @@ public class NetworkGameManager : MonoBehaviour
 
         try
         {
+            // 应用启动设置：窗口模式
+            ApplyWindowModeSetting();
+
             InstanceFinder.TimeManager.SetTickRate(64);
 
             InstanceFinder.ServerManager.OnRemoteConnectionState += HandleRemoteState;
@@ -53,6 +58,16 @@ public class NetworkGameManager : MonoBehaviour
         catch (System.Exception e)
         {
             Debug.LogError("[Net] Start exception: " + e);
+        }
+    }
+
+    public static void ApplyWindowModeSetting()
+    {
+        switch (SettingsStore.S.windowMode)
+        {
+            case 0: Screen.fullScreenMode = FullScreenMode.Windowed; break;
+            case 1: Screen.fullScreenMode = FullScreenMode.ExclusiveFullScreen; break;
+            case 2: Screen.fullScreenMode = FullScreenMode.FullScreenWindow; break;
         }
     }
 
@@ -90,12 +105,13 @@ public class NetworkGameManager : MonoBehaviour
         var args = System.Environment.GetCommandLineArgs();
         Debug.Log("[Net] Args: " + string.Join(" ", args));
 
-        // 第一遍：先扫描所有标记（-autotest / -role / -autostart / -port），再决定动作
+        // 第一遍：先扫描所有标记（-autotest / -role / -autostart / -port / -train），再决定动作
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i].ToLowerInvariant();
             if (a == "-autotest") autoTest = true;
             else if (a == "-autostart") autoStart = true;
+            else if (a == "-train") trainingMode = true;
             else if (a == "-port" && i + 1 < args.Length && ushort.TryParse(args[i + 1], out var p))
             {
                 portOverride = p;
@@ -114,6 +130,10 @@ public class NetworkGameManager : MonoBehaviour
                 case "--server":
                     StartDedicatedServer();
                     return;
+                case "-train":
+                case "--train":
+                    StartTraining();
+                    return;
                 case "-host":
                 case "--host":
                     HostGame();
@@ -128,6 +148,14 @@ public class NetworkGameManager : MonoBehaviour
         }
 
         if (autoTest) StartCoroutine(EnableAutoTest());
+    }
+
+    /// <summary>训练场：复用房主开服代码（服务器+客户端），跳过选角由 GameFlow 直接开局。</summary>
+    public void StartTraining()
+    {
+        trainingMode = true;
+        Debug.Log("[Net] 训练场模式启动（房主=服务器）");
+        HostGame();
     }
 
     private ushort EffectivePort() => hasPortOverride ? portOverride : DefaultPort;

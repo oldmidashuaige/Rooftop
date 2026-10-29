@@ -52,16 +52,16 @@ public class PlayerZombie : NetworkBehaviour
 
         if (Keyboard.current == null) return;
 
-        // F = 标记当前视野内目标
-        if (Keyboard.current.fKey.wasPressedThisFrame)
+        // 标记（默认 F）
+        if (GameInput.WasPressed(SettingsStore.S.keyMark))
             TryMark();
 
-        // 左键 = 近战感染（视野内最近人类）
-        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        // 近战感染（默认左键）
+        if (GameInput.WasPressed(SettingsStore.S.keyAttack))
             TryMelee();
 
-        // E = 啃尸体（视野内最近尸体）
-        if (Keyboard.current.eKey.wasPressedThisFrame)
+        // 啃尸体（默认 E）
+        if (GameInput.WasPressed(SettingsStore.S.keyInteract))
             TryEat();
     }
 

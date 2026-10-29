@@ -16,6 +16,7 @@ public class RoleComponent : NetworkBehaviour
     private readonly SyncVar<bool> canMark = new();
     private readonly SyncVar<int> corpseOwnerClientId = new();
     private readonly SyncVar<bool> corpseWasZombie = new();
+    private readonly SyncVar<string> displayName = new();
 
     private float stunTimer;
 
@@ -26,6 +27,7 @@ public class RoleComponent : NetworkBehaviour
     public int CorpseOwnerClientId => corpseOwnerClientId.Value;
     public bool CorpseWasZombie => corpseWasZombie.Value;
     public bool IsStunned => stunTimer > 0f;
+    public string DisplayName => displayName.Value;
 
     private Renderer bodyRenderer;
     private FirstPersonController fpc;
@@ -68,8 +70,19 @@ public class RoleComponent : NetworkBehaviour
     public override void OnStartClient()
     {
         base.OnStartClient();
+        if (IsOwner)
+        {
+            // 上报登录用户名 → 服务器广播 displayName → 所有客户端头顶显示
+            CmdSetDisplayName(SettingsStore.S.username);
+        }
         ApplyVisuals();
         ApplyControls();
+    }
+
+    [ServerRpc]
+    private void CmdSetDisplayName(string name)
+    {
+        displayName.Value = string.IsNullOrEmpty(name) ? "玩家" : name;
     }
 
     public override void OnStartServer()

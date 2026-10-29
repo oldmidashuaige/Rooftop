@@ -52,9 +52,9 @@ public class Gun : NetworkBehaviour
         }
 
         if (!inputEnabled) return;
-        if (Mouse.current == null && !AutoFire) return;
+        if (Keyboard.current == null && !AutoFire) return;
         if (!AutoFire && Cursor.lockState != CursorLockMode.Locked) return;
-        bool fire = AutoFire || Mouse.current.leftButton.isPressed;
+        bool fire = AutoFire || GameInput.IsDown(SettingsStore.S.keyAttack);
         if (fire && Time.time >= nextFireTime)
         {
             nextFireTime = Time.time + 1f / fireRate;
@@ -131,6 +131,7 @@ public class Gun : NetworkBehaviour
         }
 
         bool didHit = chosen.collider != null;
+        bool hitTarget = false; // 命中丧尸/玩家（人类或玩家丧尸）才有命中反馈
         if (didHit)
         {
             end = chosen.point;
@@ -142,6 +143,7 @@ public class Gun : NetworkBehaviour
             if (zombie != null)
             {
                 zombie.TakeDamage(dmg, headshot);
+                hitTarget = true;
             }
             else
             {
@@ -156,6 +158,7 @@ public class Gun : NetworkBehaviour
                         if (health != null)
                         {
                             health.TakeDamage(Mathf.RoundToInt(dmg));
+                            hitTarget = true;
                             var sound = FindObjectOfType<SoundEvents>();
                             if (sound != null) sound.NotifyGunshotHit(rc.transform.position);
                         }
@@ -168,15 +171,16 @@ public class Gun : NetworkBehaviour
         var se = FindObjectOfType<SoundEvents>();
         if (se != null) se.NotifyGunshot(eye, aim, Owner.ClientId);
 
-        RpcFx(eye, end, didHit);
+        RpcFx(eye, end, didHit, hitTarget);
     }
 
     [ObserversRpc]
-    private void RpcFx(Vector3 origin, Vector3 end, bool didHit)
+    private void RpcFx(Vector3 origin, Vector3 end, bool didHit, bool hitTarget)
     {
         SpawnTracer(origin, end);
         SpawnSpark(end);
-        if (didHit && IsOwner && GameHUD.Instance != null) GameHUD.Instance.OnHitMarker();
+        // 命中提示只在命中丧尸/玩家时出现（不显示在墙壁等非目标上）
+        if (hitTarget && IsOwner && GameHUD.Instance != null) GameHUD.Instance.OnHitMarker();
     }
 
     private void SpawnTracer(Vector3 from, Vector3 to)
