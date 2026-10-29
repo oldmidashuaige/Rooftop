@@ -58,51 +58,50 @@ public class MainMenuUI : MonoBehaviour
     private void BuildUI()
     {
         UIKit.EnsureEventSystem();
-        canvas = UIKit.CreateCanvas("MainMenuCanvas", 100);
+        // scaleWithScreen=true：CanvasScaler 按屏幕缩放（参考 1920x1080），布局随窗口大小自适应
+        canvas = UIKit.CreateCanvas("MainMenuCanvas", 100, scaleWithScreen: true);
         root = canvas.gameObject;
 
-        // 全屏纸色背景
+        // 全屏半透明背景（露出后面的 3D 场景，略暗以便阅读）
+        var paperColor = new Color(EndfieldTheme.Paper.r, EndfieldTheme.Paper.g, EndfieldTheme.Paper.b, 0.88f);
         var paper = UIKit.Panel("paper", root.transform, Vector2.zero, Vector2.one,
-            Vector2.zero, Vector2.zero, EndfieldTheme.Paper);
+            Vector2.zero, Vector2.zero, paperColor);
         paper.GetComponent<Image>().raycastTarget = true;
 
-        float w = Screen.width;
+        // 顶部三色条（锚点铺满全宽，随分辨率自适应）
+        UIKit.Panel("triA", root.transform, new Vector2(0f, 1f), new Vector2(1f / 3f, 1f),
+            new Vector2(0f, -40f), new Vector2(0f, -37f), EndfieldTheme.ParseHex("FF00F0"));
+        UIKit.Panel("triB", root.transform, new Vector2(1f / 3f, 1f), new Vector2(2f / 3f, 1f),
+            new Vector2(0f, -40f), new Vector2(0f, -37f), EndfieldTheme.Signal);
+        UIKit.Panel("triC", root.transform, new Vector2(2f / 3f, 1f), new Vector2(1f, 1f),
+            new Vector2(0f, -40f), new Vector2(0f, -37f), EndfieldTheme.ParseHex("00FFA2"));
 
-        // 顶部三色条
-        UIKit.Panel("triA", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(0f, -40f), new Vector2(w / 3f, -40f + 3f), EndfieldTheme.ParseHex("FF00F0"));
-        UIKit.Panel("triB", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(w / 3f, -40f), new Vector2(w * 2f / 3f, -37f), EndfieldTheme.Signal);
-        UIKit.Panel("triC", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(w * 2f / 3f, -40f), new Vector2(w, -37f), EndfieldTheme.ParseHex("00FFA2"));
-
-        // 眉标
+        // 眉标 / 大标题 / 副标题
         UILabel("// PROJECT.ROOFTOP", EndfieldTheme.Ink2, EndfieldTheme.UIFont, 13, FontStyle.Bold, 60, 150, 400, 18);
-        // 大标题
         UILabel("天 台", EndfieldTheme.Ink, EndfieldTheme.CJKFont, 44, FontStyle.Bold, 60, 168, 500, 56);
         UILabel("不对称射击恐怖 · 一份构建三种角色", EndfieldTheme.Ink2, EndfieldTheme.CJKFont, 15, FontStyle.Normal, 62, 232, 600, 22);
 
-        // 细线
-        UIKit.HLine("rule1", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(60f, -280f), new Vector2(w - 60f, -279f), EndfieldTheme.Rule);
+        // 细线（锚点铺满全宽）
+        UIKit.HLine("rule1", root.transform, new Vector2(0f, 1f), new Vector2(1f, 1f),
+            new Vector2(60f, -291f), new Vector2(-60f, -290f), EndfieldTheme.Rule);
 
-        // 输入区
-        ipField = UIKit.Input("ipInput", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(60f, -340f), new Vector2(380f, -306f), "127.0.0.1");
-        portField = UIKit.Input("portInput", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(400f, -340f), new Vector2(520f, -306f), "7770");
-
+        // 输入区：标签在输入框正上方（标签 312..330，输入框顶 336，留 6px 间距，避免重叠）
         UILabel("SERVER IP", EndfieldTheme.Ink2, EndfieldTheme.UIFont, 12, FontStyle.Bold, 60, 312, 200, 18);
+        ipField = UIKit.Input("ipInput", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+            new Vector2(60f, -368f), new Vector2(380f, -336f), "127.0.0.1");
+
         UILabel("PORT", EndfieldTheme.Ink2, EndfieldTheme.UIFont, 12, FontStyle.Bold, 400, 312, 120, 18);
+        portField = UIKit.Input("portInput", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
+            new Vector2(400f, -368f), new Vector2(520f, -336f), "7770");
 
         // 按钮
         UIKit.CutButton("btnHost", root.transform, "创建房间 · 房主", new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(60f, -380f), new Vector2(420f, -334f), () =>
+            new Vector2(60f, -400f), new Vector2(420f, -354f), () =>
             {
                 if (NetworkGameManager.Instance != null) NetworkGameManager.Instance.HostGame();
             });
         UIKit.CutButton("btnJoin", root.transform, "加入房间", new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(60f, -450f), new Vector2(420f, -404f), () =>
+            new Vector2(60f, -470f), new Vector2(420f, -424f), () =>
             {
                 if (NetworkGameManager.Instance == null) return;
                 ushort port = 7770;
@@ -110,7 +109,7 @@ public class MainMenuUI : MonoBehaviour
                 NetworkGameManager.Instance.JoinGame(ipField.text, port);
             });
         UIKit.CutButton("btnServer", root.transform, "启动专用服务器（本机测试）", new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(60f, -520f), new Vector2(420f, -474f), () =>
+            new Vector2(60f, -540f), new Vector2(420f, -494f), () =>
             {
                 if (NetworkGameManager.Instance != null) NetworkGameManager.Instance.StartDedicatedServer();
             });
@@ -120,12 +119,16 @@ public class MainMenuUI : MonoBehaviour
             EndfieldTheme.Signal, TextAnchor.MiddleLeft);
         statusText.rectTransform.anchorMin = new Vector2(0f, 1f);
         statusText.rectTransform.anchorMax = new Vector2(0f, 1f);
-        statusText.rectTransform.offsetMin = new Vector2(60f, -600f);
-        statusText.rectTransform.offsetMax = new Vector2(500f, -560f);
+        statusText.rectTransform.offsetMin = new Vector2(60f, -620f);
+        statusText.rectTransform.offsetMax = new Vector2(500f, -580f);
 
-        // 版尾字段
-        UILabel("AGPL-3.0  │  FishNet 4.7  │  URP 17.6", EndfieldTheme.Ink2, EndfieldTheme.UIFont, 12,
-            FontStyle.Normal, 60, Screen.height - 40, 500, 18);
+        // 版尾字段（参考高度 1080，锚点贴底）
+        var foot = UIKit.Text("foot", root.transform, "AGPL-3.0  │  FishNet 4.7  │  URP 17.6",
+            12, EndfieldTheme.UIFont, FontStyle.Normal, EndfieldTheme.Ink2, TextAnchor.LowerLeft);
+        foot.rectTransform.anchorMin = new Vector2(0f, 0f);
+        foot.rectTransform.anchorMax = new Vector2(0f, 0f);
+        foot.rectTransform.offsetMin = new Vector2(60f, 24f);
+        foot.rectTransform.offsetMax = new Vector2(560f, 42f);
     }
 
     /// <summary>在左上锚点坐标系放置一个文本（x 从左、y 向下）。</summary>

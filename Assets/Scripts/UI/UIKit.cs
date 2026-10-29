@@ -56,13 +56,24 @@ public static class UIKit
         es.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
     }
 
-    public static Canvas CreateCanvas(string name, int sortingOrder = 0)
+    /// <param name="scaleWithScreen">true=CanvasScaler 按屏幕缩放（参考分辨率 1920x1080）；false=恒定像素（HUD 用）。</param>
+    public static Canvas CreateCanvas(string name, int sortingOrder = 0, bool scaleWithScreen = false)
     {
         var go = new GameObject(name);
         var canvas = go.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = sortingOrder;
-        go.AddComponent<CanvasScaler>();
+        var scaler = go.AddComponent<CanvasScaler>();
+        if (scaleWithScreen)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+        else
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+        }
         // 关键：没有 GraphicRaycaster，EventSystem 无法对 Canvas 做命中检测，按钮永远点不了
         go.AddComponent<GraphicRaycaster>();
         return canvas;

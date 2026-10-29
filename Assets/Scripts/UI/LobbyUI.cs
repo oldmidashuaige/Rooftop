@@ -46,21 +46,21 @@ public class LobbyUI : MonoBehaviour
         if (built) return;
         built = true;
 
-        var canvas = UIKit.CreateCanvas("LobbyCanvas", 90);
+        var canvas = UIKit.CreateCanvas("LobbyCanvas", 90, scaleWithScreen: true);
         root = canvas.gameObject;
 
-        UIKit.Panel("paper", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, EndfieldTheme.Paper)
+        // 半透明背景（露出场景）
+        var paperColor = new Color(EndfieldTheme.Paper.r, EndfieldTheme.Paper.g, EndfieldTheme.Paper.b, 0.9f);
+        UIKit.Panel("paper", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, paperColor)
             .GetComponent<Image>().raycastTarget = true;
 
-        float w = Screen.width;
-
-        // 三色条
-        UIKit.Panel("triA", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(0f, -40f), new Vector2(w / 3f, -37f), EndfieldTheme.ParseHex("FF00F0"));
-        UIKit.Panel("triB", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(w / 3f, -40f), new Vector2(w * 2f / 3f, -37f), EndfieldTheme.Signal);
-        UIKit.Panel("triC", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(w * 2f / 3f, -40f), new Vector2(w, -37f), EndfieldTheme.ParseHex("00FFA2"));
+        // 三色条（锚点铺满全宽）
+        UIKit.Panel("triA", root.transform, new Vector2(0f, 1f), new Vector2(1f / 3f, 1f),
+            new Vector2(0f, -40f), new Vector2(0f, -37f), EndfieldTheme.ParseHex("FF00F0"));
+        UIKit.Panel("triB", root.transform, new Vector2(1f / 3f, 1f), new Vector2(2f / 3f, 1f),
+            new Vector2(0f, -40f), new Vector2(0f, -37f), EndfieldTheme.Signal);
+        UIKit.Panel("triC", root.transform, new Vector2(2f / 3f, 1f), new Vector2(1f, 1f),
+            new Vector2(0f, -40f), new Vector2(0f, -37f), EndfieldTheme.ParseHex("00FFA2"));
 
         Label("// SELECT ROLE", 60, 150, EndfieldTheme.Ink2, EndfieldTheme.UIFont, 13, FontStyle.Bold);
         Label("选择你的角色", 60, 168, EndfieldTheme.Ink, EndfieldTheme.CJKFont, 34, FontStyle.Bold);
