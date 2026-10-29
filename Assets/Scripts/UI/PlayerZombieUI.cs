@@ -39,7 +39,7 @@ public class PlayerZombieUI : MonoBehaviour
     {
         var canvas = UIKit.CreateCanvas("ZombieCanvas", 60);
         root = canvas.gameObject;
-        DontDestroyOnLoad(root);
+        // 不 DontDestroyOnLoad：玩家退出时随会话清理，避免迷雾残留
 
         // 迷雾暗角：径向暗边（透明中心→深色边缘）
         var fogRT = UIKit.Panel("fog", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, Color.black);

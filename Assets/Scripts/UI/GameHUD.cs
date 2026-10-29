@@ -35,6 +35,8 @@ public class GameHUD : MonoBehaviour
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        // 销毁自己创建的 Canvas（独立对象，不随玩家自动销毁），避免退出后 HUD/感染图标残留
+        if (root != null) Destroy(root);
     }
 
     private void BuildUI()
@@ -45,17 +47,17 @@ public class GameHUD : MonoBehaviour
         // 准星改用独立组件 Crosshair（由 FirstPersonController 创建，设置可调）
         Crosshair.Ensure();
 
-        // 命中标记（严格居中于屏幕中心）
+        // 命中标记：严格居中，斜向 X（4 根对角臂，与准星同中心）
         var hm = UIKit.Panel("hitMarker", root.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             Vector2.zero, Vector2.zero, EndfieldTheme.Signal);
         hitMarker = hm;
         hm.gameObject.SetActive(false);
         hm.anchoredPosition = Vector2.zero;
         hm.sizeDelta = Vector2.zero;
-        AddSegment(hm, -11f, -11f, 6f, 2f);
-        AddSegment(hm, 5f, -11f, 6f, 2f);
-        AddSegment(hm, -11f, 5f, 6f, 2f);
-        AddSegment(hm, 5f, 5f, 6f, 2f);
+        AddDiagonal(hm, 10f, 10f, 45f, 12f, 2f);   // 右上
+        AddDiagonal(hm, -10f, -10f, 45f, 12f, 2f); // 左下
+        AddDiagonal(hm, -10f, 10f, -45f, 12f, 2f); // 左上
+        AddDiagonal(hm, 10f, -10f, -45f, 12f, 2f); // 右下
 
         // 角色信息（左上）
         var role = UIKit.Panel("role", root.transform, new Vector2(0f, 1f), new Vector2(0f, 1f),
@@ -127,6 +129,17 @@ public class GameHUD : MonoBehaviour
         var seg = UIKit.Panel("seg", parent, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero, EndfieldTheme.Signal);
         seg.anchoredPosition = new Vector2(x, y);
         seg.sizeDelta = new Vector2(w, h);
+        seg.GetComponent<Image>().raycastTarget = false;
+    }
+
+    /// <summary>斜向命中臂：以 (x,y) 为中心、绕自身 pivot 旋转 rot°。</summary>
+    private void AddDiagonal(RectTransform parent, float x, float y, float rot, float w, float h)
+    {
+        var seg = UIKit.Panel("seg", parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            Vector2.zero, Vector2.zero, EndfieldTheme.Signal);
+        seg.anchoredPosition = new Vector2(x, y);
+        seg.sizeDelta = new Vector2(w, h);
+        seg.localRotation = Quaternion.Euler(0f, 0f, rot);
         seg.GetComponent<Image>().raycastTarget = false;
     }
 

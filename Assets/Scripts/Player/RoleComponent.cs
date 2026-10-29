@@ -85,6 +85,17 @@ public class RoleComponent : NetworkBehaviour
         displayName.Value = string.IsNullOrEmpty(name) ? "玩家" : name;
     }
 
+    public override void OnStopClient()
+    {
+        base.OnStopClient();
+        // 玩家退出：清理本地丧尸 UI（迷雾/标记），避免残留到主菜单
+        if (IsOwner && PlayerZombieUI.Instance != null)
+        {
+            PlayerZombieUI.Instance.Hide();
+            Destroy(PlayerZombieUI.Instance.gameObject);
+        }
+    }
+
     public override void OnStartServer()
     {
         base.OnStartServer();
