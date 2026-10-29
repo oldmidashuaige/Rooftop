@@ -81,6 +81,16 @@ public class LobbyUI : MonoBehaviour
 
         slotText = Label("", 60, gy + 4 * (gh + gap) + 10, EndfieldTheme.Ink, EndfieldTheme.CJKFont, 16, FontStyle.Normal);
         statusText = Label("", 60, gy + 4 * (gh + gap) + 40, EndfieldTheme.Signal, EndfieldTheme.CJKFont, 16, FontStyle.Bold);
+
+        // 立即开始（测试/少人时用：未满员也能开局，未选角色自动分配）
+        UIKit.CutButton("btnForceStart", root.transform, "立即开始（未满也能开）",
+            new Vector2(0f, 1f), new Vector2(0f, 1f),
+            new Vector2(60f, gy + 4 * (gh + gap) + 80f), new Vector2(320f, gy + 4 * (gh + gap) + 126f),
+            () =>
+            {
+                var cm = FishNet.InstanceFinder.ClientManager;
+                cm.Broadcast(new GameFlow.ForceStartBroadcast { dummy = true });
+            }, 16);
     }
 
     private Text Label(string content, float x, float y, Color color, Font font, int size, FontStyle style)
@@ -160,7 +170,9 @@ public class LobbyUI : MonoBehaviour
         SetButtonHighlight(buttons[RoleDef.HumanPool.Length], zombies >= 1);
 
         bool full2 = humans >= msg.humanSlots && zombies >= msg.zombieSlots;
-        statusText.text = full2 ? "人数已满，等待开局…" : "选择角色（人类 " + msg.humanSlots + " 名 + 丧尸 " + msg.zombieSlots + " 名）";
+        statusText.text = full2
+            ? "人数已满，即将自动开局…（未选角色将自动分配）"
+            : "选择角色（人类 " + msg.humanSlots + " 名 + 丧尸 " + msg.zombieSlots + " 名）";
     }
 
     private static int RoleLimitLocal(HumanRole r) => r == HumanRole.Student ? 4 : 1;

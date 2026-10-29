@@ -18,6 +18,8 @@ public class NetworkGameManager : MonoBehaviour
     public Vector3[] spawnPoints = { new Vector3(0f, 0.2f, -8f) };
 
     public const ushort DefaultPort = 7770;
+    private ushort portOverride;
+    private bool hasPortOverride;
     public static NetworkGameManager Instance { get; private set; }
 
     private readonly Dictionary<int, GameObject> players = new Dictionary<int, GameObject>();
@@ -67,12 +69,18 @@ public class NetworkGameManager : MonoBehaviour
         var args = System.Environment.GetCommandLineArgs();
         Debug.Log("[Net] Args: " + string.Join(" ", args));
 
-        // 第一遍：先扫描所有标记（-autotest / -role / -autostart），再决定动作，避免 -join 提前 return 漏掉后续参数
+        // 第一遍：先扫描所有标记（-autotest / -role / -autostart / -port），再决定动作
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i].ToLowerInvariant();
             if (a == "-autotest") autoTest = true;
             else if (a == "-autostart") autoStart = true;
+            else if (a == "-port" && i + 1 < args.Length && ushort.TryParse(args[i + 1], out var p))
+            {
+                portOverride = p;
+                hasPortOverride = true;
+                i++;
+            }
             else if (a == "-role" && i + 1 < args.Length) { requestedRole = args[i + 1].ToLowerInvariant(); i++; }
         }
 
@@ -101,16 +109,19 @@ public class NetworkGameManager : MonoBehaviour
         if (autoTest) StartCoroutine(EnableAutoTest());
     }
 
+    private ushort EffectivePort() => hasPortOverride ? portOverride : DefaultPort;
+
     public void HostGame()
     {
         var t = InstanceFinder.TransportManager.Transport;
         t.SetClientAddress("127.0.0.1");
         t.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4);
-        t.SetPort(DefaultPort);
+        ushort port = EffectivePort();
+        t.SetPort(port);
         InstanceFinder.ServerManager.StartConnection();
         InstanceFinder.ClientManager.StartConnection();
         if (autoTest) StartCoroutine(EnableAutoTest());
-        Debug.Log("[Net] 房主模式启动中…");
+        Debug.Log($"[Net] 房主模式启动中（端口 {port}）…");
     }
 
     public void JoinGame(string ip, ushort port)
@@ -128,9 +139,10 @@ public class NetworkGameManager : MonoBehaviour
         Debug.Log("[Net] StartDedicatedServer");
         var t = InstanceFinder.TransportManager.Transport;
         t.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4);
-        t.SetPort(DefaultPort);
+        ushort port = EffectivePort();
+        t.SetPort(port);
         bool ok = InstanceFinder.ServerManager.StartConnection();
-        Debug.Log("[Net] ServerManager.StartConnection returned " + ok);
+        Debug.Log($"[Net] 专用服务器运行中（端口 {port}）(ok={ok})；若端口被占用，FishNet 会打印 Bind exception，请关闭占用进程或用 -port 换端口");
         Application.targetFrameRate = 60;
     }
 

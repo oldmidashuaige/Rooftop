@@ -126,6 +126,15 @@ public class RoleComponent : NetworkBehaviour
                 if (hr != null) hr.material.color = corpse ? new Color(0.45f, 0.42f, 0.40f) : new Color(0.38f, 0.55f, 0.28f);
             }
         }
+
+        // 丧尸/尸体不显示枪械模型（玩家丧尸近战，无枪）
+        var gunModel = transform.Find("Camera/GunModel");
+        if (gunModel != null)
+            gunModel.gameObject.SetActive(!zombie && !corpse);
+
+        // 通知 HUD 隐藏/显示准星（丧尸无枪）
+        if (IsOwner && GameHUD.Instance != null)
+            GameHUD.Instance.SetHasGun(!zombie && !corpse);
     }
 
     private void ApplyControls()

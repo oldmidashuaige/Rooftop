@@ -10,6 +10,8 @@ public class GameConfig : ScriptableObject
     [Header("人数")]
     public int humanSlots = 5;
     public int zombieSlots = 1;
+    [Tooltip("大厅满员后若无人选角，多少秒后自动分配开局（防卡死；-autostart 则满员立即开局）")]
+    public float lobbyAutoStartDelay = 15f;
 
     [Header("感染")]
     public float infectionDuration = 30f;

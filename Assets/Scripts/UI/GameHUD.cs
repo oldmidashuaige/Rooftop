@@ -194,6 +194,17 @@ public class GameHUD : MonoBehaviour
         if (healthNum != null) healthNum.text = hp.ToString();
     }
 
+    /// <summary>是否有枪（人类=显示准星；丧尸/尸体=隐藏准星）。</summary>
+    public void SetHasGun(bool on)
+    {
+        if (root == null) return;
+        foreach (var seg in root.GetComponentsInChildren<RectTransform>(true))
+        {
+            if (seg.name == "chN" || seg.name == "chS" || seg.name == "chW" || seg.name == "chE")
+                seg.gameObject.SetActive(on);
+        }
+    }
+
     public void OnHitMarker()
     {
         if (hitMarker != null)

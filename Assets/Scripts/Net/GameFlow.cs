@@ -19,6 +19,7 @@ public class GameFlow : MonoBehaviour
     public enum RoundState { Lobby, Playing, Evacuation, Ended }
 
     [Serializable] public struct RolePickBroadcast : IBroadcast { public bool isZombie; public HumanRole role; }
+    [Serializable] public struct ForceStartBroadcast : IBroadcast { public bool dummy; }
     [Serializable] public struct LobbyEntryData : IBroadcast { public int clientId; public HumanRole role; public bool isZombie; }
     [Serializable] public struct LobbyStateBroadcast : IBroadcast { public LobbyEntryData[] entries; public int humanSlots; public int zombieSlots; public bool started; }
     [Serializable] public struct RoundStateBroadcast : IBroadcast { public int state; public float countdown; public int seatsTaken; public int seatsTotal; }
@@ -43,6 +44,7 @@ public class GameFlow : MonoBehaviour
     private readonly HashSet<int> boarded = new HashSet<int>();
     private float endTimer;
     private string resultText = "";
+    private float lobbyFullTime = -1f;
 
     public static GameFlow Instance { get; private set; }
     public RoundState State => state;
@@ -60,6 +62,7 @@ public class GameFlow : MonoBehaviour
     {
         if (InstanceFinder.NetworkManager == null) return;
         InstanceFinder.ServerManager.RegisterBroadcast<RolePickBroadcast>(HandleRolePick, false);
+        InstanceFinder.ServerManager.RegisterBroadcast<ForceStartBroadcast>(HandleForceStart, false);
         InstanceFinder.ClientManager.RegisterBroadcast<LobbyStateBroadcast>(HandleLobbyState);
         InstanceFinder.ClientManager.RegisterBroadcast<RoundStateBroadcast>(HandleRoundState);
         InstanceFinder.ClientManager.RegisterBroadcast<ResultBroadcast>(HandleResult);
@@ -72,6 +75,7 @@ public class GameFlow : MonoBehaviour
         if (Instance == this) Instance = null;
         if (InstanceFinder.NetworkManager == null) return;
         InstanceFinder.ServerManager.UnregisterBroadcast<RolePickBroadcast>(HandleRolePick);
+        InstanceFinder.ServerManager.UnregisterBroadcast<ForceStartBroadcast>(HandleForceStart);
         InstanceFinder.ClientManager.UnregisterBroadcast<LobbyStateBroadcast>(HandleLobbyState);
         InstanceFinder.ClientManager.UnregisterBroadcast<RoundStateBroadcast>(HandleRoundState);
         InstanceFinder.ClientManager.UnregisterBroadcast<ResultBroadcast>(HandleResult);
@@ -109,13 +113,26 @@ public class GameFlow : MonoBehaviour
     {
         if (state != RoundState.Lobby) return;
         if (!InstanceFinder.IsServerStarted) return;
-        var nm = NetworkGameManager.Instance;
-        if (nm == null || !nm.AutoStart) return;
 
         int need = config.humanSlots + config.zombieSlots;
         if (lobby.Count < need) return;
-        AutoAssignRoles();
-        StartRound();
+
+        var nm = NetworkGameManager.Instance;
+        if (nm != null && nm.AutoStart)
+        {
+            // -autostart：满员立即自动分配开局
+            AutoAssignRoles();
+            StartRound();
+            return;
+        }
+
+        // 无 -autostart：满员后给玩家一点选角时间，超时仍自动分配（防"人数已满等待开局"卡死）
+        if (lobbyFullTime < 0f) lobbyFullTime = Time.time;
+        if (Time.time - lobbyFullTime > config.lobbyAutoStartDelay)
+        {
+            AutoAssignRoles();
+            StartRound();
+        }
     }
 
     private void AutoAssignRoles()
@@ -140,8 +157,7 @@ public class GameFlow : MonoBehaviour
     // ============ 角色选择（大厅 UI → 服务器）============
 
     private void HandleRolePick(NetworkConnection conn, RolePickBroadcast msg, Channel channel)
-    {
-        if (state != RoundState.Lobby) return;
+    {        if (state != RoundState.Lobby) return;
         if (!lobby.TryGetValue(conn.ClientId, out var e)) return;
 
         if (msg.isZombie)
@@ -159,6 +175,17 @@ public class GameFlow : MonoBehaviour
         Debug.Log($"[Flow] 客户端 {conn.ClientId} 选角 {e.role} zombie={msg.isZombie}");
         BroadcastLobbyState();
         TryStartWhenFull();
+    }
+
+    /// <summary>任何客户端请求"立即开始"：未满员也开局（测试/调试用），未选角者自动分配。</summary>
+    private void HandleForceStart(NetworkConnection conn, ForceStartBroadcast msg, Channel channel)
+    {
+        if (state != RoundState.Lobby) return;
+        if (!InstanceFinder.IsServerStarted) return;
+        if (lobby.Count == 0) return;
+        Debug.Log($"[Flow] 客户端 {conn.ClientId} 请求立即开始");
+        AutoAssignRoles();
+        StartRound();
     }
 
     private int RoleCount(HumanRole role)
@@ -202,17 +229,25 @@ public class GameFlow : MonoBehaviour
     {
         if (state != RoundState.Lobby) return;
         state = RoundState.Playing;
+        lobbyFullTime = -1f;
         boarded.Clear();
         seatsTaken = 0;
         resultText = "";
         Debug.Log("[Flow] 开局！");
 
-        foreach (var kv in lobby)
+        try
         {
-            var conn = kv.Value.conn;
-            var nm = NetworkGameManager.Instance;
-            Vector3 pos = PickSpawn(kv.Value);
-            if (nm != null) nm.SpawnPlayerWithRole(conn, kv.Value.role, kv.Value.isZombie, pos);
+            foreach (var kv in lobby)
+            {
+                var conn = kv.Value.conn;
+                var nm = NetworkGameManager.Instance;
+                Vector3 pos = PickSpawn(kv.Value);
+                if (nm != null) nm.SpawnPlayerWithRole(conn, kv.Value.role, kv.Value.isZombie, pos);
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[Flow] 开局生成玩家异常: {e}");
         }
         BroadcastRoundState();
         BroadcastLobbyState();
@@ -255,6 +290,14 @@ public class GameFlow : MonoBehaviour
     private void Update()
     {
         if (!InstanceFinder.IsServerStarted) return;
+
+        if (state == RoundState.Lobby)
+        {
+            // 周期检查：满员超时自动开局；未满员则重置计时
+            int need = config.humanSlots + config.zombieSlots;
+            if (lobby.Count < need) lobbyFullTime = -1f;
+            MaybeAutoStart();
+        }
 
         if (state == RoundState.Evacuation)
         {
