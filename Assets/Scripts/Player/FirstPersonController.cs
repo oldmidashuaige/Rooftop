@@ -62,6 +62,8 @@ public class FirstPersonController : NetworkBehaviour
     private void Awake()
     {
         cc = GetComponent<CharacterController>();
+        // 可走上 0.75m 以下台阶（覆盖旧预制体默认 0.3m）
+        cc.stepOffset = 0.75f;
         if (cameraTransform == null)
         {
             var t = transform.Find("Camera");

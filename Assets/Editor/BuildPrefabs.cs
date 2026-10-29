@@ -38,6 +38,7 @@ public static class BuildPrefabs
         cc.height = 1.8f;
         cc.radius = 0.35f;
         cc.center = new Vector3(0f, 0.9f, 0f);
+        cc.stepOffset = 0.75f; // 可走上 0.75m 以下台阶
 
         root.AddComponent<NetworkObject>();
         var nt = root.AddComponent<NetworkTransform>();
