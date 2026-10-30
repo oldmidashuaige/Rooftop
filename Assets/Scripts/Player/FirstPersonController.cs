@@ -28,6 +28,7 @@ public class FirstPersonController : NetworkBehaviour
     public static FirstPersonController Local;
 
     public float CurrentSpeed => moveVelocity.magnitude;
+    public bool InputEnabled => inputEnabled;
 
     private CharacterController cc;
     private float localYaw;
@@ -41,6 +42,7 @@ public class FirstPersonController : NetworkBehaviour
     private Vector3 lastPos;
     private float stepAccum;
     private float hitSlowTimer;
+    private float _t;
 
     /// <summary>客户端：启用/禁用本地输入（感染僵直/尸体/观战）。</summary>
     public void SetInputEnabled(bool on)

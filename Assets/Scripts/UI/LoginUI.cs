@@ -14,6 +14,23 @@ public class LoginUI : MonoBehaviour
     private void Awake()
     {
         if (Application.isBatchMode) { Destroy(gameObject); return; } // 服务器不需要登录
+
+        // 命令行模式（-join/-host/-server/-train/-autotest）：跳过登录，直接用默认用户名。
+        // 否则登录面板会不透明地盖住整个游戏画面，导致"看不到游戏/HUD、动不了"。
+        var args = System.Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length; i++)
+        {
+            string a = args[i].ToLowerInvariant();
+            if (a == "-join" || a == "-host" || a == "-server" || a == "-train" || a == "-autotest")
+            {
+                if (string.IsNullOrEmpty(SettingsStore.S.username))
+                    SettingsStore.S.username = "玩家";
+                Debug.Log("[Login] 命令行模式，跳过登录界面 (username=" + SettingsStore.S.username + ")");
+                Destroy(gameObject);
+                return;
+            }
+        }
+
         Build();
     }
 
