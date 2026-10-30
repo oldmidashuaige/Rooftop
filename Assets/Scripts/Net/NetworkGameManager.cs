@@ -40,6 +40,9 @@ public class NetworkGameManager : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+
+        // 失去窗口焦点也继续运行/渲染：否则同机房主+客户端时，非前台窗口会暂停游戏循环（黑屏/无法操控/卡死）
+        Application.runInBackground = true;
     }
 
     private void Start()
