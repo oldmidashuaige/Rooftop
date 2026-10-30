@@ -1,7 +1,25 @@
 # Project.天台
 
 **定位**：第一人称不对称射击恐怖游戏（PvPvE）
-**引擎**：Unity 6000.6.7f1（URP 17.6.0）｜ **网络**：FishNet + Tugboat(TCP)｜ **开源**：AGPL-3.0
+**引擎**：Unity 6000.6.7f1（URP 17.6.0）
+**网络**：FishNet（pin commit `a2e2c3e`）+ Tugboat(TCP) ｜ **Tick**：64
+**UI**：uGUI·终末地风味（深色主题，强调色 `#66CCFF`）
+**开源**：AGPL-3.0
+
+> 一份 exe，靠启动参数切换角色：**专用服务器 / 房主 / 客户端**。
+
+---
+
+## 目录
+1. [游戏设计文档](#一游戏设计文档完整)
+2. [当前实现进度](#二当前实现进度)
+3. [技术架构](#三技术架构)
+4. [如何运行（构建 / 启动 / 操作）](#四如何运行构建--启动--操作)
+5. [设置系统](#五设置系统)
+6. [具体玩法](#六具体玩法)
+7. [文件结构对照](#七文件结构对照哪个文件对应什么)
+8. [常见问题 / 踩坑记录](#八常见问题--踩坑记录)
+9. [开发路线图](#九开发路线图)
 
 ---
 
@@ -42,7 +60,27 @@
 
 ---
 
-## 二、技术架构
+## 二、当前实现进度
+
+**已完成（阶段零+一+二 + 系统功能）：**
+
+| 模块 | 状态 |
+|---|---|
+| 网络基座（三角色/认证/64tick/Tugboat TCP） | ✅ |
+| 核心 FPS 闭环（移动/开枪/僵尸/血量/刷怪/脚步） | ✅ |
+| 阵营差异化（8 角色池/5 职业能力/玩家丧尸/人机仇恨 AI） | ✅ |
+| 回合流程（大厅选角→开局→撤离→结算） | ✅ |
+| **登录界面**（离线用户名，头顶显示） | ✅ |
+| **设置系统**（设置文件持久化：灵敏度/键位/准星/窗口） | ✅ |
+| **训练场**（单人，-train 或主菜单） | ✅ |
+| **暂停菜单**（Esc：继续/设置/退出） | ✅ |
+| 门（碰撞 + 交互 + 钥匙/撬锁/重锁） | ✅ |
+| 0.75m 台阶 | ✅ |
+| **未实现**：电闸/电梯/照明联动、电台破坏、零件、多层地图、天台强光、特殊模式 | ⏳ 阶段三~六 |
+
+---
+
+## 三、技术架构
 
 ```
 一份 exe，靠启动参数切换角色（核心原则：一切游戏计算默认在服务器）
@@ -59,20 +97,32 @@
 | 门/电闸/电梯/电台状态 | 服务器 |
 | 本地 UI / 音效 / 迷雾 / 观战相机 | 客户端 |
 
-**通信机制**：`ServerRpc`（客户端→服务器请求）、`ObserversRpc/TargetRpc`（服务器→客户端通知）、`Broadcast`（版本认证/大厅状态/回合状态/声音事件）、`NetworkTransform`（玩家=客户端权威，僵尸=服务器权威）。
+**通信机制**：
+- `ServerRpc`：客户端→服务器请求（开火/交互/技能/标记/啃尸）
+- `ObserversRpc / TargetRpc`：服务器→客户端通知（特效/状态/观战）
+- `Broadcast`：版本认证 / 大厅状态 / 回合状态 / 声音事件 / 登录用户名
+- `NetworkTransform`：玩家=客户端权威，僵尸=服务器权威
+- `SyncVar<T>`：跨端状态（职业/阵营/尸体/门开关/玩家名等）
+
+**关键设计**：
+- **一份构建三角色**：`-server`（headless）/ `-host` / `-join`
+- **同对象转职**：感染/被啃转化不销毁重建 NetworkObject，规避所有权切换风险
+- **幽灵观战纯客户端**：隐形相机本地控制，服务器只管状态
 
 ---
 
-## 三、如何运行
+## 四、如何运行（构建 / 启动 / 操作）
 
 ### 1. 构建
 
-编辑器打开项目后：
-- 菜单 **Tools → Build Network Prefabs**（首次/改预制体后）
-- 菜单 **Tools → Build Game Scene**（首次/改场景后）
-- 菜单 **Tools → Build Windows**（产出 `Builds/Rooftop.exe`，绝对路径）
+编辑器打开项目后依次执行：
+1. 菜单 **Tools → Build Network Prefabs**（首次/改预制体后）
+2. 菜单 **Tools → Build Game Scene**（首次/改场景后）
+3. 菜单 **Tools → Build Windows**（产出 `Builds/Rooftop.exe`，绝对路径）
 
-### 2. 启动参数（一份构建三角色）
+> 编辑器工具菜单：`Tools/Build Network Prefabs`、`Tools/Build Game Scene`、`Tools/Build Windows`、`Tools/Generate Sfx`、`Tools/Clear Demo Objects`。
+
+### 2. 启动参数
 
 | 参数 | 作用 |
 |---|---|
@@ -81,51 +131,127 @@
 | `-join <IP>` | 客户端（采集输入/渲染/音效） |
 | `-autotest` | 客户端自动移动/开枪（压测用） |
 | `-autostart` | 服务器满员立即自动分配开局 |
+| `-train` | 训练场（单人，复用房主开服、跳过选角直接开局） |
 | `-role human\|zombie\|auto` | 预选角色（预留） |
 | `-port <端口>` | 指定端口（默认 7770） |
 
 **示例**：
 ```powershell
+# 专用服务器（压测）：自动开局，接受 5 人类+1 丧尸
 Builds\Rooftop.exe -server -batchmode -nographics -autostart -logFile srv.log
+
+# 单人训练场
+Builds\Rooftop.exe -train
+
+# 房主建房
 Builds\Rooftop.exe -host
+
+# 客户端加入（-autotest 为压测自动移动/开枪）
 Builds\Rooftop.exe -join 127.0.0.1 -autotest
 Builds\Rooftop.exe -join 127.0.0.1
 ```
 
-### 3. 常见问题
+### 3. 启动流程（手动）
 
-- **服务器起不来 / Bind exception**：端口被旧进程/编辑器占用 → 关掉占用进程，或 `-port 换端口`。
-- **大厅满员不开局**：已做 15s 安全自动开局；也可点「立即开始」按钮强制开局。
-- **双 AudioListener / 65533 报错**：均已规避（菜单相机不挂监听、Tugboat TCP 替代 Synapse UDP）。
+1. **登录**：启动先显示登录界面，输入用户名（离线），点「进 入」。
+2. **主菜单**：可 创建房间（房主）/ 加入房间 / 启动专用服务器 / 训练场 / 设置。
+3. **大厅**（建房/加入后）：从 **8 名角色池**选 5 人类 + 1 丧尸；满员自动开局（15s 内未选角自动分配），也可点「立即开始」强制开局。
+4. **局内**：Esc 暂停（继续/设置/退出）；退出到主菜单会结束训练场服务器、重置状态。
 
 ---
 
-## 四、文件结构对照（哪个文件对应什么）
+## 五、设置系统
+
+设置保存在 `persistentDataPath/settings.json`（Windows 下通常在 `%USERPROFILE%\AppData\LocalLow\DefaultCompany\Rooftop\settings.json`），每次启动自动加载。
+
+入口：主菜单右上「设 置」按钮，或局内 Esc → 设置。所有改动**即时生效并保存**。
+
+| 设置项 | 说明 |
+|---|---|
+| 用户名 | 登录时输入，游戏内头顶显示 |
+| 鼠标灵敏度 | 步进调整 0.01~0.5 |
+| 准星·中心点 | 开关（默认开） |
+| 准星·水平线 | 开关（默认开） |
+| 准星·竖直线 | 开关（默认开） |
+| 准星·长度 | 单侧长度 2~40 |
+| 准星·粗细 | 线宽 1~12 |
+| 准星·颜色 | 手动输入 `#RRGGBB`，右侧**实时色块**预览；也有预设循环 |
+| 窗口模式 | 窗口 / 全屏 / 无边框 循环切换 |
+| 键位 | 12 个动作可重绑（前进/后退/左移/右移/跑步/跳跃/交互啃尸/攻击/标记/血清/紫外枪/暂停），点击行后按下新键；支持鼠标键 |
+
+> 设置面板内容较多，可用**鼠标滚轮 / 右侧滑块**滚动查看；「◀ 返回」或 Esc 返回上一级菜单。
+
+---
+
+## 六、具体玩法
+
+### 人类（员工/弟弟/哥哥/博士/学生）
+
+| 按键（默认） | 动作 |
+|---|---|
+| WASD | 移动（可走上 0.75m 以下台阶） |
+| Shift | 跑步 |
+| 空格 | 跳跃 |
+| 鼠标 | 视角 |
+| 左键 | 开枪（服务器判定命中/爆头；命中丧尸/玩家才显示命中 X） |
+| E | 交互：开门/关门、员工钥匙、哥哥撬门、呼叫救援 |
+| 鼠标右键（博士） | 紫外线枪（对丧尸僵直，限次） |
+| G（博士） | 血清（解除感染者，限次） |
+| Esc | 暂停菜单 |
+
+**玩法**：呼叫救援 → 3 人撤离即赢。小心友伤、人机丧尸按声音追你（安静+躲墙后最安全）、玩家丧尸会标记你让人机集火、被抓=感染=30s 后变丧尸。
+
+### 玩家丧尸
+
+| 按键（默认） | 动作 |
+|---|---|
+| WASD/Shift/空格 | 移动/跑/跳（速度约 125% 人类） |
+| 左键 | 近战（命中人类→感染） |
+| F | 标记视野内人类（冷却，需先吃回自己尸体才有） |
+| E | 啃尸体（人类尸体→该玩家转丧尸；自己的尸体→恢复标记能力） |
+
+**玩法**：感染人类让他们 30s 后加入丧尸阵营；标记制造人机集火；被击杀后弱化重生（无标记），去找并吃掉自己的尸体恢复能力；人类开枪会暴露位置（屏幕方向箭头）。玩家丧尸有**迷雾视野**。
+
+### 幽灵观战（死亡后）
+
+| 按键 | 动作 |
+|---|---|
+| WASD / 空格 / Shift | 自由飞行（穿墙，隐形无声） |
+| 滚轮 | 在存活玩家间切换 |
+| 左键 | 附身到该玩家视角 |
+| 右键 | 退出附身 |
+
+被玩家丧尸啃咬时：**固定视角看自己的尸体** → 转化为玩家丧尸继续游戏。
+
+---
+
+## 七、文件结构对照（哪个文件对应什么）
 
 ### 网络与回合（`Assets/Scripts/Net/`）
 | 文件 | 职责 |
 |---|---|
-| `NetworkGameManager.cs` | 命令行解析、开服/建房/加入、`-port`/`-autotest`/`-autostart`、连接事件、按角色生成玩家 |
+| `NetworkGameManager.cs` | 命令行解析、开服/建房/加入、`-port/-autotest/-autostart/-train`、连接事件、按角色生成玩家、退出到主菜单（结束训练场服务器/重置状态）、窗口模式应用、菜单相机禁用 |
 | `ProtocolAuthenticator.cs` | 协议版本握手认证、5s 超时踢人 |
-| `GameFlow.cs` | 回合状态机（大厅→进行→撤离→结算）、8 角色池分配、撤离 3 座先到先得、胜负判定、立即开始 |
+| `GameFlow.cs` | 回合状态机（大厅→进行→撤离→结算）、8 角色池分配、撤离 3 座先到先得、胜负判定、立即开始、训练场直接开局、ResetToLobby |
 | `RoleDef.cs` | 职业定义/元数据/能力查询（钥匙/撬门/移速等） |
 
 ### 玩家（`Assets/Scripts/Player/`）
 | 文件 | 职责 |
 |---|---|
-| `FirstPersonController.cs` | 第一人称移动/跳跃/镜头（客户端权威）、脚步判定、角色速度加成、受击减速 |
+| `FirstPersonController.cs` | 第一人称移动/跳跃/镜头（客户端权威，`stepOffset=0.75`）、脚步判定、角色速度加成、受击减速、本地玩家引用 |
 | `PlayerHealth.cs` | 血量（服务器）、感染无敌、死亡分派（人类→尸体观战 / 玩家丧尸→弱化重生） |
-| `RoleComponent.cs` | 玩家对象核心状态：职业/阵营/尸体/转化；同步视觉（含隐藏丧尸枪械模型）与输入开关 |
+| `RoleComponent.cs` | 玩家对象核心状态：职业/阵营/尸体/转化/玩家名；同步视觉（隐藏丧尸枪械模型）与输入开关、玩家退出清理 |
 | `InfectionSystem.cs` | 感染状态机（30s 倒计时、CG 僵直、血清解除、同客户端转职） |
-| `HumanAbilities.cs` | 人类职业能力按键（钥匙/撬门/紫外枪/血清/呼叫撤离） |
+| `HumanAbilities.cs` | 人类职业能力按键（钥匙/撬门/紫外枪/血清/呼叫撤离，交互射线命中 Trigger） |
 | `PlayerZombie.cs` | 玩家丧尸能力（标记/近战感染/啃尸/吃尸体恢复/弱化重生） |
 | `SpectatorLink.cs` | 观战桥接（服务器驱动进入/退出幽灵观战、固定视角） |
 | `SpectatorController.cs` | 客户端幽灵相机（自由飞行/附身/滚轮切换/右键退出/固定看尸体） |
+| `NameTag.cs` | 头顶用户名（世界空间标签，始终看向相机） |
 
 ### 战斗（`Assets/Scripts/Combat/`）
 | 文件 | 职责 |
 |---|---|
-| `Gun.cs` | 客户端瞄准+散布→`CmdFire`；服务器 Raycast 判定（爆头/友伤/打玩家丧尸）→ `RpcFx` 特效 |
+| `Gun.cs` | 客户端瞄准+散布→`CmdFire`；服务器 Raycast 判定（爆头/友伤/打玩家丧尸）→ `RpcFx` 特效；命中提示只在命中丧尸/玩家时触发 |
 
 ### 丧尸（`Assets/Scripts/Zombie/`）
 | 文件 | 职责 |
@@ -138,7 +264,7 @@ Builds\Rooftop.exe -join 127.0.0.1
 ### 交互物（`Assets/Scripts/Items/`）
 | 文件 | 职责 |
 |---|---|
-| `Door.cs` | 门（普通/上锁、钥匙/撬/重锁、开合动画） |
+| `Door.cs` | 门（普通/上锁、钥匙/撬/重锁、开合动画、实体碰撞体运行时兜底） |
 | `RadioStation.cs` | 电台（E 呼叫救援） |
 | `ExtractionZone.cs` | 撤离判定区（先到先得登机） |
 
@@ -146,27 +272,37 @@ Builds\Rooftop.exe -join 127.0.0.1
 | 文件 | 职责 |
 |---|---|
 | `EndfieldTheme.cs` | 主题 token（深色/#66CCFF 强调色/字体） |
-| `UIKit.cs` | 程序化 uGUI 构建器（切角按钮/面板/细线/输入框/GraphicRaycaster） |
-| `MainMenuUI.cs` | 主菜单（标题/IP/端口/创建/加入/专用服务器） |
+| `UIKit.cs` | 程序化 uGUI 构建器（切角按钮/面板/细线/输入框/ScrollView/GraphicRaycaster/随屏缩放） |
+| `LoginUI.cs` | 启动登录界面（离线用户名） |
+| `MainMenuUI.cs` | 主菜单（标题/IP/端口/创建/加入/专用服务器/训练场/设置） |
 | `LobbyUI.cs` | 选角大厅（8 角色+丧尸位、立即开始、人数状态） |
-| `GameHUD.cs` | HUD（准星/生命/角色/感染 CG 占位/撤离倒计时/结算） |
+| `PauseMenu.cs` | 局内暂停菜单（Esc：继续/设置/退出，居中） |
+| `SettingsPanel.cs` | 设置面板（灵敏度/准星/颜色hex+色块/窗口/键位重绑，可滚动） |
+| `Crosshair.cs` | 准星（中心点/横线/竖线/长度/粗细/颜色，设置驱动） |
+| `GameHUD.cs` | HUD（生命/角色/命中 X/感染 CG 占位/撤离倒计时/结算；退出时销毁 Canvas 防残留） |
 | `PlayerZombieUI.cs` | 玩家丧尸 UI（迷雾暗角/标记冷却/枪声方向/自己尸体箭头） |
 
-### 音频 / 配置 / 运行时
+### 配置（`Assets/Scripts/Config/`）
+| 文件 | 职责 |
+|---|---|
+| `GameConfig.cs` | 全局数值配置（SO：人数/感染/撤离/仇恨/声音参数/大厅自动开局延迟） |
+| `GameSettings.cs` | 玩家设置（settings.json 存取：灵敏度/键位/准星/窗口/用户名） |
+| `GameInput.cs` | 统一键位读取（键盘+鼠标，供 Gun/HumanAbilities/PlayerZombie 用） |
+| `Assets/Resources/Config/GameConfig.asset` | 实际数值资产（集中可调） |
+
+### 音频 / 运行时
 | 文件 | 职责 |
 |---|---|
 | `Assets/Scripts/Audio/SfxLibrary.cs` | 从 Resources/Sfx 加载 WAV |
 | `Assets/Scripts/Audio/SfxAt.cs` | 世界坐标 3D 音效 |
-| `Assets/Scripts/Config/GameConfig.cs` | 全局数值配置（SO，集中可调） |
-| `Assets/Resources/Config/GameConfig.asset` | 实际数值资产（人数/感染时长/撤离/仇恨/声音参数…） |
-| `Assets/Scripts/Runtime/SceneBuilder.cs` | 程序化测试场景构建（世界/管理器/门/电台/撤离区） |
+| `Assets/Scripts/Runtime/SceneBuilder.cs` | 程序化测试场景构建（世界/管理器/门[含 Solid 碰撞]/电台/撤离区） |
 | `Assets/Scripts/Runtime/DemoObject.cs` | 烘焙标记（Clear 用） |
 
 ### 编辑器工具（`Assets/Editor/`）
 | 文件 | 职责 |
 |---|---|
-| `BuildPrefabs.cs` | 烘焙 NetworkPlayer/Zombie 预制体 + 注册 DefaultPrefabObjects |
-| `BuildScene.cs` | 构建游戏场景 Main.unity（接线预制体引用） |
+| `BuildPrefabs.cs` | 烘焙 NetworkPlayer/Zombie 预制体（玩家相机 MainCamera/stepOffset 0.75）+ 注册 DefaultPrefabObjects |
+| `BuildScene.cs` | 构建游戏场景 Main.unity（含登录界面、接线预制体引用） |
 | `Builder.cs` | Windows 构建入口（绝对路径输出） |
 | `GenerateSfx.cs` | 程序化合成 WAV 烘焙到 Resources/Sfx |
 | `MaterialAssets.cs` | 材质资产确保 |
@@ -174,54 +310,37 @@ Builds\Rooftop.exe -join 127.0.0.1
 ### 预制体与场景
 | 资源 | 内容 |
 |---|---|
-| `Assets/Prefabs/NetworkPlayer.prefab` | 玩家（Body/Head/Camera/GunModel + 全部玩家组件） |
+| `Assets/Prefabs/NetworkPlayer.prefab` | 玩家（Body/Head/Camera[MainCamera]/GunModel + 全部玩家组件） |
 | `Assets/Prefabs/Zombie.prefab` | 人机丧尸（Body/Head + SimpleZombie/HatredBrain） |
-| `Assets/Scenes/Main.unity` | 游戏主场景（世界/NetworkManager/GameFlow/ZombieSpawner/门/电台/撤离区/主菜单） |
+| `Assets/Scenes/Main.unity` | 游戏主场景（世界/NetworkManager/GameFlow/ZombieSpawner/门/电台/撤离区/主菜单/登录） |
 
 ---
 
-## 五、具体玩法（操作说明）
+## 八、常见问题 / 踩坑记录
 
-### 人类（员工/弟弟/哥哥/博士/学生）
-| 按键 | 动作 |
+| 问题 | 处理 |
 |---|---|
-| WASD | 移动 |
-| Shift | 跑步 |
-| 空格 | 跳跃 |
-| 鼠标 | 视角 |
-| 左键 | 开枪（服务器判定命中/爆头） |
-| E | 交互：开门/关门、员工钥匙、哥哥撬门、呼叫救援 |
-| 鼠标右键（博士） | 紫外线枪（对丧尸僵直，限次） |
-| G（博士） | 血清（解除感染者，限次） |
-| Esc | 解锁/锁定鼠标 |
-
-**玩法**：找零件修电台（阶段三）→ 呼叫救援 → 3 人撤离即赢。小心友伤、人机丧尸按声音追你（安静+躲墙后最安全）、玩家丧尸会标记你让人机集火、被抓=感染=30s 后变丧尸。
-
-### 玩家丧尸
-| 按键 | 动作 |
-|---|---|
-| WASD/Shift/空格 | 移动/跑/跳（速度约 125% 人类） |
-| 左键 | 近战（命中人类→感染） |
-| F | 标记视野内人类（冷却，需先吃回自己尸体才有） |
-| E | 啃尸体（人类尸体→该玩家转丧尸；自己的尸体→恢复标记能力） |
-
-**玩法**：感染人类让他们 30s 后加入丧尸阵营；标记制造人机集火；被击杀后弱化重生（无标记），去找并吃掉自己的尸体恢复能力；人类开枪会暴露位置（屏幕方向箭头）。
-
-### 幽灵观战（死亡后）
-| 按键 | 动作 |
-|---|---|
-| WASD / 空格 / Shift | 自由飞行（穿墙，隐形无声） |
-| 滚轮 | 在存活玩家间切换 |
-| 左键 | 附身到该玩家视角 |
-| 右键 | 退出附身 |
-
-被玩家丧尸啃咬时：**固定视角看自己的尸体** → 转化为玩家丧尸继续游戏。
+| 服务器起不来 / Bind exception | 端口被旧进程/编辑器占用 → 关掉占用进程，或 `-port 换端口` |
+| 大厅满员不开局 | 已做 15s 安全自动开局；也可点「立即开始」强制开局 |
+| 65533 / unhandled PacketId | 已规避：用 **Tugboat(TCP)** 替代 Synapse(UDP) |
+| 双 AudioListener | 菜单相机不挂监听；玩家出生后禁用菜单相机 |
+| 命中提示打墙也闪 | 已修复：只在命中丧尸/玩家时反馈 |
+| 门无法交互/无碰撞 | 已修复：交互射线命中 Trigger；门有实体碰撞体；玩家相机正确设为 MainCamera |
+| 退出后 UI/感染图标残留 | 已修复：HUD 退出时销毁 Canvas；玩家退出清理丧尸 UI |
+| 训练场退出后重进鼠标不锁定 | 已修复：退出重置 GameFlow 状态、结束训练场服务器 |
+| 设置不生效 | 改动即保存到 settings.json；重绑键位后无需重启 |
 
 ---
 
-## 六、开发路线图（后续阶段）
+## 九、开发路线图
 
 - **阶段三**：电梯/电闸照明联动、完整门规则（破坏）、电台破坏、零件
 - **阶段四**：多层大楼地图（大厅/地下室/办公区/天台）、2 楼梯+2 电梯、道具分布、天台强光
 - **阶段五**：特殊模式（隐藏感染者/团结一致/灭口小队）
 - **阶段六**：打磨（3D 音效定位/客户端预测/断线重连/房主迁移）
+
+---
+
+## 协议
+
+AGPL-3.0（强制衍生作品也必须开源）。参考实现：D:\Documents\try（Unity 6000.6.7f1 + FishNet + Tugboat TCP）。
