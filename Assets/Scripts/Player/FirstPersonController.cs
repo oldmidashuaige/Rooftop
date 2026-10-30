@@ -122,6 +122,21 @@ public class FirstPersonController : NetworkBehaviour
     {
         if (!IsOwner || !inputEnabled) return;
 
+        // 同机多窗口：失焦自动解锁鼠标（可自由点另一个窗口），重获焦点重新锁定
+        if (Application.isFocused)
+        {
+            if (Cursor.lockState != CursorLockMode.Locked)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+        }
+        else if (Cursor.lockState == CursorLockMode.Locked)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+
         if (Keyboard.current == null) return;
 
         var role = GetComponent<RoleComponent>();
