@@ -16,6 +16,9 @@ public class LobbyUI : MonoBehaviour
     private readonly List<RectTransform> buttons = new List<RectTransform>();
     private Text statusText;
     private Text slotText;
+    private RectTransform hostRow;
+    private Text countText;
+    private int currentTotal = 6;
     private bool built;
 
     private void Awake()
@@ -82,15 +85,53 @@ public class LobbyUI : MonoBehaviour
         slotText = Label("", 60, gy + 4 * (gh + gap) + 10, EndfieldTheme.Ink, EndfieldTheme.CJKFont, 16, FontStyle.Normal);
         statusText = Label("", 60, gy + 4 * (gh + gap) + 40, EndfieldTheme.Signal, EndfieldTheme.CJKFont, 16, FontStyle.Bold);
 
-        // 立即开始（测试/少人时用：未满员也能开局，未选角色自动分配）
-        UIKit.CutButton("btnForceStart", root.transform, "立即开始（未满也能开）",
+        // 房主：设置总玩家数（最低 2 = 1 丧尸 + 1 玩家；最高 9）。非房主整行隐藏。
+        var hostGo = new GameObject("hostRow");
+        hostGo.transform.SetParent(root.transform, false);
+        hostRow = hostGo.AddComponent<RectTransform>();
+        hostRow.anchorMin = new Vector2(0f, 1f);
+        hostRow.anchorMax = new Vector2(0f, 1f);
+        hostRow.offsetMin = new Vector2(0f, -718f);
+        hostRow.offsetMax = new Vector2(320f, -688f);
+        var hostLbl = UIKit.Text("cntLbl", hostRow, "玩家数", 15, EndfieldTheme.CJKFont, FontStyle.Normal,
+            EndfieldTheme.Ink2, TextAnchor.MiddleLeft);
+        hostLbl.rectTransform.anchorMin = new Vector2(0f, 1f);
+        hostLbl.rectTransform.anchorMax = new Vector2(0f, 1f);
+        hostLbl.rectTransform.offsetMin = new Vector2(60f, -24f);
+        hostLbl.rectTransform.offsetMax = new Vector2(140f, -2f);
+        UIKit.CutButton("cntMinus", hostRow, "−",
             new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(60f, gy + 4 * (gh + gap) + 80f), new Vector2(320f, gy + 4 * (gh + gap) + 126f),
+            new Vector2(150f, -29f), new Vector2(182f, -1f),
+            () => SendSetCount(Mathf.Max(2, currentTotal - 1)), 16);
+        countText = UIKit.Text("cntVal", hostRow, currentTotal.ToString(), 16, EndfieldTheme.CJKFont, FontStyle.Bold,
+            EndfieldTheme.Signal, TextAnchor.MiddleCenter);
+        countText.rectTransform.anchorMin = new Vector2(0f, 1f);
+        countText.rectTransform.anchorMax = new Vector2(0f, 1f);
+        countText.rectTransform.offsetMin = new Vector2(186f, -24f);
+        countText.rectTransform.offsetMax = new Vector2(258f, -2f);
+        UIKit.CutButton("cntPlus", hostRow, "+",
+            new Vector2(0f, 1f), new Vector2(0f, 1f),
+            new Vector2(262f, -29f), new Vector2(294f, -1f),
+            () => SendSetCount(Mathf.Min(9, currentTotal + 1)), 16);
+        hostRow.gameObject.SetActive(InstanceFinder.IsHost);
+
+        // 立即开始（最低 1 丧尸 + 1 玩家；未满员也能开局，未选角色自动分配）
+        UIKit.CutButton("btnForceStart", root.transform, "立即开始（≥2 人可开）",
+            new Vector2(0f, 1f), new Vector2(0f, 1f),
+            new Vector2(60f, gy + 4 * (gh + gap) + 120f), new Vector2(320f, gy + 4 * (gh + gap) + 166f),
             () =>
             {
                 var cm = FishNet.InstanceFinder.ClientManager;
                 cm.Broadcast(new GameFlow.ForceStartBroadcast { dummy = true });
             }, 16);
+    }
+
+    private void SendSetCount(int total)
+    {
+        currentTotal = total;
+        if (countText != null) countText.text = total.ToString();
+        var cm = InstanceFinder.ClientManager;
+        cm.Broadcast(new GameFlow.SetPlayerCountBroadcast { total = total });
     }
 
     private Text Label(string content, float x, float y, Color color, Font font, int size, FontStyle style)
@@ -147,6 +188,10 @@ public class LobbyUI : MonoBehaviour
 
         if (!root.activeSelf) root.SetActive(true);
 
+        // 房主行：回显服务器当前的玩家数设置
+        currentTotal = msg.totalPlayers;
+        if (countText != null) countText.text = currentTotal.ToString();
+
         // 刷新已选状态：已满的角色格子标强调色
         int humans = 0, zombies = 0;
         foreach (var e in msg.entries)
@@ -170,9 +215,12 @@ public class LobbyUI : MonoBehaviour
         SetButtonHighlight(buttons[RoleDef.HumanPool.Length], zombies >= 1);
 
         bool full2 = humans >= msg.humanSlots && zombies >= msg.zombieSlots;
-        statusText.text = full2
-            ? "人数已满，即将自动开局…（未选角色将自动分配）"
-            : "选择角色（人类 " + msg.humanSlots + " 名 + 丧尸 " + msg.zombieSlots + " 名）";
+        if (msg.entries.Length < 2)
+            statusText.text = "至少需要 1 丧尸 + 1 玩家才能开局";
+        else
+            statusText.text = full2
+                ? "人数已满，即将自动开局…（未选角色将自动分配）"
+                : "选择角色（人类 " + msg.humanSlots + " 名 + 丧尸 " + msg.zombieSlots + " 名）";
     }
 
     private static int RoleLimitLocal(HumanRole r) => r == HumanRole.Student ? 4 : 1;

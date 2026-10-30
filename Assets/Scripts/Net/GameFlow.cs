@@ -21,7 +21,8 @@ public class GameFlow : MonoBehaviour
     [Serializable] public struct RolePickBroadcast : IBroadcast { public bool isZombie; public HumanRole role; }
     [Serializable] public struct ForceStartBroadcast : IBroadcast { public bool dummy; }
     [Serializable] public struct LobbyEntryData : IBroadcast { public int clientId; public HumanRole role; public bool isZombie; }
-    [Serializable] public struct LobbyStateBroadcast : IBroadcast { public LobbyEntryData[] entries; public int humanSlots; public int zombieSlots; public bool started; }
+    [Serializable] public struct LobbyStateBroadcast : IBroadcast { public LobbyEntryData[] entries; public int humanSlots; public int zombieSlots; public int totalPlayers; public bool started; }
+    [Serializable] public struct SetPlayerCountBroadcast : IBroadcast { public int total; }
     [Serializable] public struct RoundStateBroadcast : IBroadcast { public int state; public float countdown; public int seatsTaken; public int seatsTotal; }
 
     private class LobbyEntry
@@ -36,6 +37,12 @@ public class GameFlow : MonoBehaviour
     public Vector3[] humanSpawnPoints;
     public Vector3 officeSpawnPoint;
     public Vector3 zombieSpawnPoint;
+
+    // 运行期玩家数（房主可设）：总人数 2~9，人类 = 总数 - 丧尸数（默认 1 丧尸）
+    private int runtimeTotalPlayers;
+    private int runtimeHumanSlots;
+    private int runtimeZombieSlots;
+    private bool serverCountPending = true;
 
     private readonly Dictionary<int, LobbyEntry> lobby = new Dictionary<int, LobbyEntry>();
     private RoundState state = RoundState.Lobby;
@@ -56,6 +63,9 @@ public class GameFlow : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
         if (config == null) config = GameConfig.Load();
+        runtimeZombieSlots = config.zombieSlots;
+        runtimeTotalPlayers = config.humanSlots + config.zombieSlots;
+        runtimeHumanSlots = config.humanSlots;
     }
 
     private void Start()
@@ -63,11 +73,24 @@ public class GameFlow : MonoBehaviour
         if (InstanceFinder.NetworkManager == null) return;
         InstanceFinder.ServerManager.RegisterBroadcast<RolePickBroadcast>(HandleRolePick, false);
         InstanceFinder.ServerManager.RegisterBroadcast<ForceStartBroadcast>(HandleForceStart, false);
+        InstanceFinder.ServerManager.RegisterBroadcast<SetPlayerCountBroadcast>(HandleSetPlayerCount, false);
         InstanceFinder.ClientManager.RegisterBroadcast<LobbyStateBroadcast>(HandleLobbyState);
         InstanceFinder.ClientManager.RegisterBroadcast<RoundStateBroadcast>(HandleRoundState);
         InstanceFinder.ClientManager.RegisterBroadcast<ResultBroadcast>(HandleResult);
         if (InstanceFinder.IsServerStarted && NetworkGameManager.Instance != null && NetworkGameManager.Instance.AutoStart)
             StartCoroutine(AutoStartLoop());
+    }
+
+    /// <summary>专用服务器用（-players N）：等价房主设置玩家数，无需本机客户端。</summary>
+    public void ApplyServerPlayerCount(int total)
+    {
+        if (!InstanceFinder.IsServerStarted) return;
+        int t = Mathf.Clamp(total, 2, 9);
+        runtimeTotalPlayers = t;
+        runtimeZombieSlots = config.zombieSlots;
+        runtimeHumanSlots = Mathf.Max(1, t - runtimeZombieSlots);
+        Debug.Log($"[Flow] 服务器玩家数 {t}（人类 {runtimeHumanSlots} + 丧尸 {runtimeZombieSlots}）");
+        BroadcastLobbyState();
     }
 
     private void OnDestroy()
@@ -76,6 +99,7 @@ public class GameFlow : MonoBehaviour
         if (InstanceFinder.NetworkManager == null) return;
         InstanceFinder.ServerManager.UnregisterBroadcast<RolePickBroadcast>(HandleRolePick);
         InstanceFinder.ServerManager.UnregisterBroadcast<ForceStartBroadcast>(HandleForceStart);
+        InstanceFinder.ServerManager.UnregisterBroadcast<SetPlayerCountBroadcast>(HandleSetPlayerCount);
         InstanceFinder.ClientManager.UnregisterBroadcast<LobbyStateBroadcast>(HandleLobbyState);
         InstanceFinder.ClientManager.UnregisterBroadcast<RoundStateBroadcast>(HandleRoundState);
         InstanceFinder.ClientManager.UnregisterBroadcast<ResultBroadcast>(HandleResult);
@@ -176,7 +200,7 @@ public class GameFlow : MonoBehaviour
         if (state != RoundState.Lobby) return;
         if (!InstanceFinder.IsServerStarted) return;
 
-        int need = config.humanSlots + config.zombieSlots;
+        int need = runtimeHumanSlots + runtimeZombieSlots;
         if (lobby.Count < need) return;
 
         var nm = NetworkGameManager.Instance;
@@ -202,7 +226,7 @@ public class GameFlow : MonoBehaviour
         int human = 0;
         foreach (var kv in lobby)
         {
-            if (human < config.humanSlots)
+            if (human < runtimeHumanSlots)
             {
                 kv.Value.isZombie = false;
                 kv.Value.role = RoleDef.HumanPool[human % RoleDef.HumanPool.Length];
@@ -239,12 +263,27 @@ public class GameFlow : MonoBehaviour
         TryStartWhenFull();
     }
 
-    /// <summary>任何客户端请求"立即开始"：未满员也开局（测试/调试用），未选角者自动分配。</summary>
+    /// <summary>仅房主（本机连接）可设置总玩家数（2~9）：人类 = 总数 - 丧尸数，最少 1 丧尸 + 1 人类。</summary>
+    private void HandleSetPlayerCount(NetworkConnection conn, SetPlayerCountBroadcast msg, Channel channel)
+    {
+        if (state != RoundState.Lobby) return;
+        if (!InstanceFinder.IsServerStarted) return;
+        var local = InstanceFinder.ClientManager != null ? InstanceFinder.ClientManager.Connection : null;
+        if (local == null || local != conn) return; // 仅房主可改
+        int total = Mathf.Clamp(msg.total, 2, 9);
+        runtimeTotalPlayers = total;
+        runtimeZombieSlots = config.zombieSlots;
+        runtimeHumanSlots = Mathf.Max(1, total - runtimeZombieSlots);
+        Debug.Log($"[Flow] 房主设置总玩家数 {total}（人类 {runtimeHumanSlots} + 丧尸 {runtimeZombieSlots}）");
+        BroadcastLobbyState();
+    }
+
+    /// <summary>任何客户端请求"立即开始"：未满员也开局（测试/调试用），未选角者自动分配。最低 1 丧尸 + 1 玩家。</summary>
     private void HandleForceStart(NetworkConnection conn, ForceStartBroadcast msg, Channel channel)
     {
         if (state != RoundState.Lobby) return;
         if (!InstanceFinder.IsServerStarted) return;
-        if (lobby.Count == 0) return;
+        if (lobby.Count < 2) return; // 最低 1 丧尸 + 1 玩家才能开
         Debug.Log($"[Flow] 客户端 {conn.ClientId} 请求立即开始");
         AutoAssignRoles();
         StartRound();
@@ -281,7 +320,7 @@ public class GameFlow : MonoBehaviour
             if (kv.Value.isZombie) zombies++;
             else humans++;
         }
-        if (humans == config.humanSlots && zombies == config.zombieSlots)
+        if (humans == runtimeHumanSlots && zombies == runtimeZombieSlots)
             StartRound();
     }
 
@@ -353,10 +392,19 @@ public class GameFlow : MonoBehaviour
     {
         if (!InstanceFinder.IsServerStarted) return;
 
+        // -players N 懒应用：避免与 NetworkGameManager 解析参数的先后顺序耦合
+        if (serverCountPending)
+        {
+            serverCountPending = false;
+            var nm = NetworkGameManager.Instance;
+            if (nm != null && nm.RequestedPlayers > 0)
+                ApplyServerPlayerCount(nm.RequestedPlayers);
+        }
+
         if (state == RoundState.Lobby)
         {
             // 周期检查：满员超时自动开局；未满员则重置计时
-            int need = config.humanSlots + config.zombieSlots;
+            int need = runtimeHumanSlots + runtimeZombieSlots;
             if (lobby.Count < need) lobbyFullTime = -1f;
             MaybeAutoStart();
         }
@@ -431,8 +479,9 @@ public class GameFlow : MonoBehaviour
         BroadcastAll(new LobbyStateBroadcast
         {
             entries = list.ToArray(),
-            humanSlots = config.humanSlots,
-            zombieSlots = config.zombieSlots,
+            humanSlots = runtimeHumanSlots,
+            zombieSlots = runtimeZombieSlots,
+            totalPlayers = runtimeTotalPlayers,
             started = state != RoundState.Lobby
         });
     }

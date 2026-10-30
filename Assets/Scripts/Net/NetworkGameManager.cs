@@ -28,10 +28,13 @@ public class NetworkGameManager : MonoBehaviour
     private bool autoStart;
     private string requestedRole = "auto";
     private bool trainingMode;
+    private int requestedPlayers = -1;
 
     public IReadOnlyCollection<GameObject> Players => players.Values;
     public bool AutoStart => autoStart;
     public bool TrainingMode => trainingMode;
+    /// <summary>-players N：专用服务器无房主 UI，用它等价设置总玩家数（2~9）。</summary>
+    public int RequestedPlayers => requestedPlayers;
 
     private void Awake()
     {
@@ -134,6 +137,11 @@ public class NetworkGameManager : MonoBehaviour
                 i++;
             }
             else if (a == "-role" && i + 1 < args.Length) { requestedRole = args[i + 1].ToLowerInvariant(); i++; }
+            else if (a == "-players" && i + 1 < args.Length && int.TryParse(args[i + 1], out var n))
+            {
+                requestedPlayers = Mathf.Clamp(n, 2, 9);
+                i++;
+            }
         }
 
         for (int i = 0; i < args.Length; i++)
@@ -157,7 +165,7 @@ public class NetworkGameManager : MonoBehaviour
                 case "--join":
                     string ip = "127.0.0.1";
                     if (i + 1 < args.Length && !args[i + 1].StartsWith("-")) { ip = args[i + 1]; i++; }
-                    JoinGame(ip, DefaultPort);
+                    JoinGame(ip, EffectivePort());
                     return;
             }
         }
