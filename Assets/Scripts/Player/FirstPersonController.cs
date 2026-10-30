@@ -142,13 +142,15 @@ public class FirstPersonController : NetworkBehaviour
 
         if (cc.isGrounded && KeyPressed(SettingsStore.S.keyJump))
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+
+        // 移动改为每渲染帧执行（与鼠标视角同步，消除 50Hz 物理 tick 与渲染帧错拍导致的移动卡顿）
+        if (IsOwner)
+            ApplyMovementLocally(Time.deltaTime);
     }
 
     private void FixedUpdate()
     {
-        if (IsOwner)
-            ApplyMovementLocally(Time.fixedDeltaTime);
-
+        // 服务端脚步判定：读的是 NetworkTransform 同步来的位置（50Hz），与物理步长一致
         if (IsServerStarted)
             UpdateServerFootsteps();
     }
