@@ -28,7 +28,6 @@ public class FirstPersonController : NetworkBehaviour
     public static FirstPersonController Local;
 
     public float CurrentSpeed => moveVelocity.magnitude;
-    public bool InputEnabled => inputEnabled;
 
     private CharacterController cc;
     private float localYaw;
@@ -42,7 +41,6 @@ public class FirstPersonController : NetworkBehaviour
     private Vector3 lastPos;
     private float stepAccum;
     private float hitSlowTimer;
-    private float _t;
 
     /// <summary>客户端：启用/禁用本地输入（感染僵直/尸体/观战）。</summary>
     public void SetInputEnabled(bool on)
@@ -86,9 +84,10 @@ public class FirstPersonController : NetworkBehaviour
         inputEnabled = true;
         localYaw = transform.eulerAngles.y;
 
-        // 游戏内 UI：准星 + 暂停菜单
+        // 游戏内 UI：准星 + 暂停菜单 + HUD（本地玩家专属，避免多个 GameHUD 实例销毁相机）
         Crosshair.Ensure();
         PauseMenu.Ensure();
+        GameHUD.Ensure();
 
         var rc = GetComponent<RoleComponent>();
         float bonus = 1f;
@@ -116,7 +115,14 @@ public class FirstPersonController : NetworkBehaviour
     public override void OnStopClient()
     {
         base.OnStopClient();
-        if (Local == this) Local = null;
+        if (Local == this)
+        {
+            Local = null;
+            // 清理本地专属 UI（HUD/准星/暂停），避免退出后残留
+            if (GameHUD.Instance != null) Destroy(GameHUD.Instance.gameObject);
+            if (Crosshair.Instance != null) Destroy(Crosshair.Instance.gameObject);
+            if (PauseMenu.Instance != null) Destroy(PauseMenu.Instance.gameObject);
+        }
         inputEnabled = false;
     }
 

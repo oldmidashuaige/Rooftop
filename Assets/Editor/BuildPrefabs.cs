@@ -77,8 +77,8 @@ public static class BuildPrefabs
         camGo.AddComponent<Camera>();
         camGo.AddComponent<AudioListener>();
         var gun = camGo.AddComponent<Gun>();
-        camGo.AddComponent<GameHUD>();
-
+        // GameHUD 不再挂在预制体上：改为本地玩家出生时动态创建（GameHUD.Ensure），
+        // 避免多玩家实例的单例 Awake 冲突时 Destroy(gameObject) 把相机一起销毁。
         BuildGunModel(camGo.transform, mats.gun);
         gun.tracerMaterial = mats.tracer;
         gun.sparkMaterial = mats.spark;

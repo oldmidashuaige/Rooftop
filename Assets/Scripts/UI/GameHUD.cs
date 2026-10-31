@@ -9,6 +9,7 @@ public class GameHUD : MonoBehaviour
 {
     public static GameHUD Instance;
 
+    private RoleComponent roleRef;
     private GameObject root;
     private Text healthNum;
     private Text zombieNum;
@@ -25,10 +26,32 @@ public class GameHUD : MonoBehaviour
     private float infStartTime;
     private float infDuration;
 
+    /// <summary>
+    /// 本地玩家出生时创建（FirstPersonController.OnStartClient owner 分支调用）。
+    /// 只给本地玩家建 HUD：GameHUD 不再挂在预制体相机上，
+    /// 避免多个玩家实例的 Awake 单例冲突时 Destroy(gameObject) 把相机一起销毁。
+    /// </summary>
+    public static void Ensure()
+    {
+        if (Instance == null)
+        {
+            var go = new GameObject("GameHUD");
+            go.AddComponent<GameHUD>();
+            var fpc = FirstPersonController.Local;
+            if (fpc != null) Instance.roleRef = fpc.GetComponent<RoleComponent>();
+        }
+    }
+
     private void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            enabled = false; // 只保留第一个实例；绝不在 Awake 里 Destroy(gameObject)（那会连相机一起销毁）
+            return;
+        }
         Instance = this;
+        var fpc = FirstPersonController.Local;
+        if (fpc != null) roleRef = fpc.GetComponent<RoleComponent>();
         BuildUI();
     }
 
@@ -159,7 +182,9 @@ public class GameHUD : MonoBehaviour
         // 刷新角色信息
         if (roleText != null && root != null && root.activeSelf)
         {
-            var rc = GetComponentInParent<RoleComponent>();
+            var rc = roleRef;
+            if (rc == null && FirstPersonController.Local != null)
+                rc = FirstPersonController.Local.GetComponent<RoleComponent>();
             if (rc != null)
             {
                 string team = rc.IsZombie ? "玩家丧尸" : RoleDef.DisplayName(rc.Role);
