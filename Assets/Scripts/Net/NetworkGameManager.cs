@@ -22,9 +22,6 @@ public class NetworkGameManager : MonoBehaviour
     private bool hasPortOverride;
     public static NetworkGameManager Instance { get; private set; }
 
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern bool SetProcessDPIAware();
-
     /// <summary>当前所在房间的 IP / 端口（大厅顶部显示用）。</summary>
     public string CurrentIp { get; private set; } = "127.0.0.1";
     public ushort CurrentPort { get; private set; } = DefaultPort;
@@ -65,9 +62,6 @@ public class NetworkGameManager : MonoBehaviour
 
         try
         {
-            // 进程 DPI 感知：避免 Windows 在高 DPI 显示器上把窗口放大导致 UI/文字模糊
-            try { SetProcessDPIAware(); } catch { }
-
             // 应用启动设置：窗口模式
             ApplyWindowModeSetting();
 
