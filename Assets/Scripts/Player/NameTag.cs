@@ -38,12 +38,12 @@ public class NameTag : MonoBehaviour
         canvasRt.offsetMin = Vector2.zero;
         canvasRt.offsetMax = Vector2.zero;
 
-        // 居中容器：每帧移动到玩家头部投影位置
+        // 居中容器：每帧移动到玩家头部投影位置（底边锚定头部上方，向上偏移）
         var box = new GameObject("Box", typeof(RectTransform));
         box.transform.SetParent(canvasRt, false);
         boxRt = (RectTransform)box.transform;
         boxRt.anchorMin = boxRt.anchorMax = new Vector2(0.5f, 0.5f);
-        boxRt.pivot = new Vector2(0.5f, 0.5f);
+        boxRt.pivot = new Vector2(0.5f, 0f);
         boxRt.sizeDelta = new Vector2(320f, 52f);
 
         nameText = MakeText("NameTag", new Vector2(0f, 1f), new Vector2(320f, 28f), 14, Color.white, TextAnchor.MiddleCenter);
@@ -86,10 +86,13 @@ public class NameTag : MonoBehaviour
 
         if (show && cam != null)
         {
-            Vector3 head = transform.position + Vector3.up * 2.3f;
+            Vector3 head = transform.position + Vector3.up * 2.2f;
             Vector3 sp = cam.WorldToScreenPoint(head);
+            // 限制在屏幕内（避免贴边/越界时标签跑到奇怪位置）
             if (sp.z > 0f)
             {
+                sp.x = Mathf.Clamp(sp.x, 60f, Screen.width - 60f);
+                sp.y = Mathf.Clamp(sp.y, 30f, Screen.height - 30f);
                 if (!canvasRt.gameObject.activeSelf) canvasRt.gameObject.SetActive(true);
                 if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, sp, null, out Vector2 local))
                     boxRt.anchoredPosition = local;

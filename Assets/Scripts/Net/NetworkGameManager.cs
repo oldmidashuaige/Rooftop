@@ -22,6 +22,10 @@ public class NetworkGameManager : MonoBehaviour
     private bool hasPortOverride;
     public static NetworkGameManager Instance { get; private set; }
 
+    /// <summary>当前所在房间的 IP / 端口（大厅顶部显示用）。</summary>
+    public string CurrentIp { get; private set; } = "127.0.0.1";
+    public ushort CurrentPort { get; private set; } = DefaultPort;
+
     private readonly Dictionary<int, GameObject> players = new Dictionary<int, GameObject>();
     private int nextSpawnIndex;
     private bool autoTest;
@@ -31,6 +35,13 @@ public class NetworkGameManager : MonoBehaviour
     private int requestedPlayers = -1;
 
     public IReadOnlyCollection<GameObject> Players => players.Values;
+
+    /// <summary>按客户端连接 ID 查玩家对象（无则 null）。</summary>
+    public GameObject GetPlayer(int clientId)
+    {
+        players.TryGetValue(clientId, out var go);
+        return go;
+    }
     public bool AutoStart => autoStart;
     public bool TrainingMode => trainingMode;
     /// <summary>-players N：专用服务器无房主 UI，用它等价设置总玩家数（2~9）。</summary>
@@ -53,6 +64,9 @@ public class NetworkGameManager : MonoBehaviour
         {
             // 应用启动设置：窗口模式
             ApplyWindowModeSetting();
+
+            // 开始游戏前不渲染 3D 场景：禁用菜单相机，用背景图（玩家出生后玩家相机接管）
+            MenuBackground.DisableMenuCamera();
 
             InstanceFinder.TimeManager.SetTickRate(64);
 
@@ -212,6 +226,9 @@ public class NetworkGameManager : MonoBehaviour
         t.SetServerBindAddress("0.0.0.0", IPAddressType.IPv4);
         ushort port = EffectivePort();
         t.SetPort(port);
+        CurrentIp = "127.0.0.1";
+        CurrentPort = port;
+        RoomsHistory.Add("我的房间", "127.0.0.1", port.ToString());
         InstanceFinder.ServerManager.StartConnection();
         InstanceFinder.ClientManager.StartConnection();
         if (autoTest) StartCoroutine(EnableAutoTest());
@@ -223,6 +240,9 @@ public class NetworkGameManager : MonoBehaviour
         var t = InstanceFinder.TransportManager.Transport;
         t.SetClientAddress(ip.Trim());
         t.SetPort(port);
+        CurrentIp = ip.Trim();
+        CurrentPort = port;
+        RoomsHistory.Add("加入的房间", ip.Trim(), port.ToString());
         InstanceFinder.ClientManager.StartConnection();
         if (autoTest) StartCoroutine(EnableAutoTest());
         Debug.Log($"[Net] 连接 {ip}:{port} …");

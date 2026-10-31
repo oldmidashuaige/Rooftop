@@ -21,7 +21,7 @@ public class LoginUI : MonoBehaviour
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i].ToLowerInvariant();
-            if (a == "-join" || a == "-host" || a == "-server" || a == "-train" || a == "-autotest")
+            if (a == "-join" || a == "-host" || a == "-server" || a == "-train" || a == "-autotest" || a == "-menu")
             {
                 if (string.IsNullOrEmpty(SettingsStore.S.username))
                     SettingsStore.S.username = "玩家";
@@ -39,6 +39,7 @@ public class LoginUI : MonoBehaviour
         UIKit.EnsureEventSystem();
         canvas = UIKit.CreateCanvas("LoginCanvas", 200, scaleWithScreen: true);
         root = canvas.gameObject;
+        MenuBackground.AddTo(canvas);
 
         var paperColor = new Color(EndfieldTheme.Paper.r, EndfieldTheme.Paper.g, EndfieldTheme.Paper.b, 0.96f);
         var paper = UIKit.Panel("paper", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, paperColor);
