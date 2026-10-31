@@ -58,12 +58,14 @@ public class NameTag : MonoBehaviour
         bgImg.color = new Color(0.10f, 0.12f, 0.14f, 0.82f);
         bgImg.raycastTarget = false;
 
-        // 名字（上）：粗体白
+        // 名字（上）：粗体白。偏移计算（TagHeight=48，底板 y∈[-23,23]）：
+        // 两行块(20名+6间距+14角色=40)以锚点对称居中→块顶+20块底-20；
+        // 名字字形中心 +10 → 相对顶部锚点(24)偏移 -14；角色字形中心 -13 → 相对底部锚点(-24)偏移 +11。
         nameText = MakeText("TagName", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -3f), new Vector2(TagWidth - 10f, 26f), 20, FontStyle.Bold, Color.white);
+            new Vector2(0f, -14f), new Vector2(TagWidth - 10f, 24f), 20, FontStyle.Bold, Color.white);
         // 角色行（下）：强调色
         roleText = MakeText("TagRole", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(0f, 3f), new Vector2(TagWidth - 10f, 20f), 14, FontStyle.Normal, EndfieldTheme.Signal);
+            new Vector2(0f, 11f), new Vector2(TagWidth - 10f, 18f), 14, FontStyle.Normal, EndfieldTheme.Signal);
 
         tagRoot.gameObject.SetActive(false);
     }
