@@ -1,39 +1,76 @@
 using UnityEngine;
+using UnityEngine.UI;
+using FishNet.Object;
 
 /// <summary>
-/// 头顶标签（世界空间）：用户名在上，角色在下方 [角色]。
-/// 始终看向本地相机；尸体/观战时隐藏。服务器权威下发用户名，所有客户端可见。
+/// 头顶标签（屏幕空间 Overlay）：玩家名在上，[角色名] 在下。
+/// 每帧把玩家头部投影到屏幕坐标定位 → 始终跟随玩家；隐藏自己/尸体/身后。
+/// 用 Overlay uGUI（TextMesh 与世界空间 uGUI 在 URP 构建中不渲染）。
 /// </summary>
 public class NameTag : MonoBehaviour
 {
-    private TextMesh nameTm;
-    private TextMesh roleTm;
-    private Transform nameTr;
-    private Transform roleTr;
-    private Transform cam;
+    private RectTransform canvasRt;
+    private RectTransform boxRt;
+    private Text nameText;
+    private Text roleText;
+    private Camera cam;
     private string lastName = "";
     private string lastRole = "";
 
-    private void Awake()
+    private Camera ViewCam()
     {
-        nameTr = MakeLine("NameTag", new Vector3(0f, 2.55f, 0f), 24, Color.white, out nameTm);
-        roleTr = MakeLine("RoleTag", new Vector3(0f, 2.30f, 0f), 20, EndfieldTheme.Signal, out roleTm);
+        if (Camera.main != null) return Camera.main;
+        var fpc = FirstPersonController.Local;
+        if (fpc != null && fpc.cameraTransform != null) return fpc.cameraTransform.GetComponent<Camera>();
+        return null;
     }
 
-    private Transform MakeLine(string goName, Vector3 localPos, int fontSize, Color color, out TextMesh tm)
+    private void Awake()
     {
-        var go = new GameObject(goName);
-        go.transform.SetParent(transform, false);
-        go.transform.localPosition = localPos;
-        tm = go.AddComponent<TextMesh>();
-        tm.font = EndfieldTheme.CJKFont != null ? EndfieldTheme.CJKFont : EndfieldTheme.UIFont;
-        tm.fontSize = fontSize;
-        tm.characterSize = 0.03f;
-        tm.anchor = TextAnchor.MiddleCenter;
-        tm.alignment = TextAlignment.Center;
-        tm.color = color;
-        tm.text = "";
-        return go.transform;
+        var go = new GameObject("NameTagCanvas");
+        var canvas = go.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 120;
+        go.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+        canvasRt = (RectTransform)go.transform;
+        canvasRt.anchorMin = Vector2.zero;
+        canvasRt.anchorMax = Vector2.one;
+        canvasRt.offsetMin = Vector2.zero;
+        canvasRt.offsetMax = Vector2.zero;
+
+        // 居中容器：每帧移动到玩家头部投影位置
+        var box = new GameObject("Box", typeof(RectTransform));
+        box.transform.SetParent(canvasRt, false);
+        boxRt = (RectTransform)box.transform;
+        boxRt.anchorMin = boxRt.anchorMax = new Vector2(0.5f, 0.5f);
+        boxRt.pivot = new Vector2(0.5f, 0.5f);
+        boxRt.sizeDelta = new Vector2(320f, 52f);
+
+        nameText = MakeText("NameTag", new Vector2(0f, 1f), new Vector2(320f, 28f), 14, Color.white, TextAnchor.MiddleCenter);
+        roleText = MakeText("RoleTag", new Vector2(0f, 0f), new Vector2(320f, 22f), 11, EndfieldTheme.Signal, TextAnchor.MiddleCenter);
+
+        go.SetActive(false);
+    }
+
+    private Text MakeText(string goName, Vector2 anchor, Vector2 size, int fontSize, Color color, TextAnchor align)
+    {
+        var tgo = new GameObject(goName, typeof(RectTransform));
+        tgo.transform.SetParent(boxRt, false);
+        var rt = (RectTransform)tgo.transform;
+        rt.anchorMin = anchor;
+        rt.anchorMax = anchor;
+        rt.pivot = anchor;
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = size;
+        var t = tgo.AddComponent<Text>();
+        t.font = EndfieldTheme.CJKFont != null ? EndfieldTheme.CJKFont : EndfieldTheme.UIFont;
+        t.fontSize = fontSize;
+        t.alignment = align;
+        t.color = color;
+        t.horizontalOverflow = HorizontalWrapMode.Overflow;
+        t.verticalOverflow = VerticalWrapMode.Overflow;
+        t.raycastTarget = false;
+        return t;
     }
 
     private void Update()
@@ -42,41 +79,28 @@ public class NameTag : MonoBehaviour
         if (rc == null) return;
 
         bool show = !rc.IsCorpse;
+        var no = GetComponent<NetworkObject>();
+        if (no != null && no.IsOwner) show = false; // 不显示自己的标签
 
-        if (!show)
-        {
-            if (nameTr.gameObject.activeSelf) nameTr.gameObject.SetActive(false);
-            if (roleTr.gameObject.activeSelf) roleTr.gameObject.SetActive(false);
-            return;
-        }
-        if (!nameTr.gameObject.activeSelf) nameTr.gameObject.SetActive(true);
-        if (!roleTr.gameObject.activeSelf) roleTr.gameObject.SetActive(true);
+        if (show && cam == null) cam = ViewCam();
 
-        string name = rc.DisplayName;
-        if (name != lastName)
+        if (show && cam != null)
         {
-            lastName = name;
-            nameTm.text = name;
-        }
-
-        string role = "[" + (rc.IsZombie ? "丧尸" : RoleDef.DisplayName(rc.Role)) + "]";
-        if (role != lastRole)
-        {
-            lastRole = role;
-            roleTm.text = role;
-        }
-
-        if (cam == null && Camera.main != null) cam = Camera.main.transform;
-        if (cam != null)
-        {
-            Vector3 dir = transform.position - cam.position;
-            dir.y = 0f;
-            if (dir.sqrMagnitude > 0.001f)
+            Vector3 head = transform.position + Vector3.up * 2.3f;
+            Vector3 sp = cam.WorldToScreenPoint(head);
+            if (sp.z > 0f)
             {
-                var rot = Quaternion.LookRotation(dir);
-                nameTr.rotation = rot;
-                roleTr.rotation = rot;
+                if (!canvasRt.gameObject.activeSelf) canvasRt.gameObject.SetActive(true);
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, sp, null, out Vector2 local))
+                    boxRt.anchoredPosition = local;
+
+                string name = rc.DisplayName;
+                if (name != lastName) { lastName = name; nameText.text = name; }
+                string role = "[" + (rc.IsZombie ? "丧尸" : RoleDef.DisplayName(rc.Role)) + "]";
+                if (role != lastRole) { lastRole = role; roleText.text = role; }
+                return;
             }
         }
+        if (canvasRt.gameObject.activeSelf) canvasRt.gameObject.SetActive(false);
     }
 }
