@@ -166,9 +166,7 @@ public class MainMenuUI : MonoBehaviour
         float tableTop = 158f;
         float tableH = 220f;
 
-        // 表头
-        MakeTableHeader(rootRt, lx, tableTop, tableH);
-        // 表体（可滚动）
+        // 表体（可滚动，表头为内容首行，与数据行同坐标系严格对齐）
         var (vp, content, _) = UIKit.ScrollView("historyScroll", rootRt,
             new Vector2(0f, 1f), new Vector2(1f, 1f),
             new Vector2(lx, -(tableTop + 32f + tableH)), new Vector2(-rx, -(tableTop + 32f)),
@@ -216,62 +214,35 @@ public class MainMenuUI : MonoBehaviour
         return rootRt;
     }
 
-    private void MakeTableHeader(RectTransform parent, float lx, float topY, float h)
-    {
-        float[] widths = { 0.30f, 0.20f, 0.12f, 0.18f, 0.20f };
-        string[] heads = { "房主 / 房间", "IP", "端口", "时间", "加入" };
-        float x = lx;
-        for (int i = 0; i < widths.Length; i++)
-        {
-            float w = 720f * widths[i]; // 表格总宽约 720
-            var cell = UIKit.Panel("h" + i, parent, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(x, -(topY + 26f)), new Vector2(x + w, -(topY)),
-                new Color(EndfieldTheme.Chip.r, EndfieldTheme.Chip.g, EndfieldTheme.Chip.b, 0.8f));
-            var t = UIKit.Text("ht", cell, heads[i], 14, EndfieldTheme.CJKFont, FontStyle.Bold, EndfieldTheme.Ink2, TextAnchor.MiddleCenter);
-            t.rectTransform.anchorMin = Vector2.zero;
-            t.rectTransform.anchorMax = Vector2.one;
-            t.rectTransform.offsetMin = Vector2.zero;
-            t.rectTransform.offsetMax = Vector2.zero;
-            x += w;
-        }
-    }
+    /// <summary>历史表列宽比例（5 列，和为 1，与视口宽度自适应）。</summary>
+    private static readonly float[] ColFrac = { 0.30f, 0.20f, 0.12f, 0.18f, 0.20f };
 
     private void RefreshHistory()
     {
         if (historyBody == null) return;
-        // 清空旧行
         for (int i = historyBody.childCount - 1; i >= 0; i--)
             Object.Destroy(historyBody.GetChild(i).gameObject);
 
         var recs = RoomsHistory.Records;
-        float[] widths = { 0.30f, 0.20f, 0.12f, 0.18f, 0.20f };
         float rowH = 34f;
+
+        // 表头行（滚动内容首行，与数据行同宽同坐标系 → 严格对齐）
+        AddTableRow(historyBody, "head", 0, rowH, new[] { "房主 / 房间", "IP", "端口", "时间", "加入" },
+            new Color(EndfieldTheme.Chip.r, EndfieldTheme.Chip.g, EndfieldTheme.Chip.b, 0.8f), EndfieldTheme.Ink2, true);
+
         for (int i = 0; i < recs.Count; i++)
         {
             var r = recs[i];
-            var row = UIKit.Panel("row" + i, historyBody, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(0f, -(i * rowH + rowH)), new Vector2(720f, -(i * rowH)),
-                (i % 2 == 0) ? new Color(0f, 0f, 0f, 0.25f) : new Color(0f, 0f, 0f, 0.12f));
+            var row = AddTableRow(historyBody, "row" + i, i + 1, rowH,
+                new[] { r.name, r.ip, r.port, r.time },
+                (i % 2 == 0) ? new Color(0f, 0f, 0f, 0.25f) : new Color(0f, 0f, 0f, 0.12f),
+                EndfieldTheme.Ink, false);
             row.gameObject.AddComponent<RowHover>();
 
-            string[] cells = { r.name, r.ip, r.port, r.time };
-            float x = 0f;
-            for (int c = 0; c < 4; c++)
-            {
-                float w = 720f * widths[c];
-                var cell = UIKit.Panel("c" + c, row, Vector2.zero, Vector2.one,
-                    new Vector2(x, 0f), new Vector2(x + w, 0f), Color.clear);
-                var t = UIKit.Text("t", cell, cells[c], 14, EndfieldTheme.CJKFont, FontStyle.Normal, EndfieldTheme.Ink, TextAnchor.MiddleCenter);
-                t.rectTransform.anchorMin = Vector2.zero;
-                t.rectTransform.anchorMax = Vector2.one;
-                t.rectTransform.offsetMin = Vector2.zero;
-                t.rectTransform.offsetMax = Vector2.zero;
-                x += w;
-            }
-            // 加入按钮
+            // 加入按钮（末列，贴右端不出视口）
             string ip = r.ip, port = r.port;
-            UIKit.CutButton("join", row, "加入", new Vector2(0f, 0f), new Vector2(1f, 1f),
-                new Vector2(720f * 0.80f, 3f), new Vector2(720f - 3f, -3f),
+            UIKit.CutButton("join", row, "加入", new Vector2(0.80f, 0f), new Vector2(1f, 1f),
+                new Vector2(6f, 3f), new Vector2(-6f, -3f),
                 () =>
                 {
                     if (NetworkGameManager.Instance == null) return;
@@ -280,8 +251,30 @@ public class MainMenuUI : MonoBehaviour
                     NetworkGameManager.Instance.JoinGame(ip, p);
                 }, 13);
         }
-        // 更新 content 高度
-        historyBody.sizeDelta = new Vector2(0f, recs.Count * rowH + 10f);
+        historyBody.sizeDelta = new Vector2(0f, (recs.Count + 1) * rowH + 10f);
+    }
+
+    /// <summary>在滚动内容中添加一行：分数列（与表头同宽），行高 rowH，内容居中。</summary>
+    private RectTransform AddTableRow(RectTransform parent, string name, int rowIndex, float rowH,
+        string[] cells, Color bg, Color textColor, bool bold)
+    {
+        var row = UIKit.Panel(name, parent, new Vector2(0f, 1f), new Vector2(1f, 1f),
+            new Vector2(0f, -((rowIndex + 1) * rowH)), new Vector2(0f, -(rowIndex * rowH)), bg);
+        float cum = 0f;
+        for (int c = 0; c < cells.Length; c++)
+        {
+            float c0 = cum, c1 = cum + ColFrac[c];
+            cum = c1;
+            var cell = UIKit.Panel("c" + c, row, new Vector2(c0, 0f), new Vector2(c1, 1f),
+                Vector2.zero, Vector2.zero, Color.clear);
+            var t = UIKit.Text("t", cell, cells[c], 14, EndfieldTheme.CJKFont,
+                bold ? FontStyle.Bold : FontStyle.Normal, textColor, TextAnchor.MiddleCenter);
+            t.rectTransform.anchorMin = Vector2.zero;
+            t.rectTransform.anchorMax = Vector2.one;
+            t.rectTransform.offsetMin = Vector2.zero;
+            t.rectTransform.offsetMax = Vector2.zero;
+        }
+        return row;
     }
 
     private RectTransform BuildPlaceholder(RectTransform parent, string title, string desc)
